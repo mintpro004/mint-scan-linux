@@ -147,7 +147,6 @@ class MintScanApp:
         MalwareScreen  = _safe('malware',     'MalwareScreen')
         SysFixScreen   = _safe('sysfix',      'SysFixScreen')
         SettingsScreen  = _safe('settings',   'SettingsScreen')
-        WirelessScreen  = _safe('wireless',   'WirelessScreen')
 
         # screen_classes: only include screens that loaded
         _all_screens = [
@@ -166,7 +165,6 @@ class MintScanApp:
             ('malware',  MalwareScreen),
             ('sysfix',   SysFixScreen),
             ('settings',  SettingsScreen),
-            ('wireless',  WirelessScreen),
         ]
         screen_classes = {k: v for k, v in _all_screens if v is not None}
 
@@ -189,7 +187,8 @@ class MintScanApp:
             ('SYS FIX',     'sysfix'),
             ('SETTINGS',    'settings'),
             ('FIREWALL',    'firewall'),
-            ('WIFI SYNC',   'wireless'),
+            ('TOOLBOX',     'toolbox'),
+            ('INVESTIGATE', 'investigate'),
         ]
         tabs = [(lbl, key) for lbl, key in ALL_TABS if key in screen_classes]
 

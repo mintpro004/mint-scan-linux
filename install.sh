@@ -1,12 +1,10 @@
 #!/bin/bash
 # ╔══════════════════════════════════════════════════════════════╗
 # ║     MINT SCAN v7 — SELF-HEALING INSTALLER                   ║
-# ║     Fixes broken files automatically on every run           ║
 # ║     github.com/mintpro004/mint-scan-linux                   ║
 # ╚══════════════════════════════════════════════════════════════╝
 CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 RED='\033[0;31m'; BOLD='\033[1m'; NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -16,23 +14,19 @@ echo "║     MINT SCAN v7 — SELF-HEALING INSTALLER                   ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
-# ── 1. Fix ownership ──────────────────────────────────────────────
 echo -e "${YELLOW}[1/6] Fixing ownership...${NC}"
 sudo chown -R "$USER:$USER" "$SCRIPT_DIR" 2>/dev/null || true
 echo -e "${GREEN}  ✓ Done${NC}"
 
-# ── 2. System packages ────────────────────────────────────────────
 echo -e "${YELLOW}[2/6] Installing system packages...${NC}"
 sudo apt-get update -qq 2>/dev/null || true
 sudo apt-get install -y -qq \
     python3 python3-pip python3-tk python3-dev python3-venv \
     net-tools wireless-tools iw network-manager \
     nmap adb curl git dbus libnotify-bin sqlite3 \
-    tcpdump clamav clamav-daemon rkhunter \
-    2>/dev/null || true
+    tcpdump clamav clamav-daemon rkhunter 2>/dev/null || true
 echo -e "${GREEN}  ✓ Done${NC}"
 
-# ── 3. Python environment ─────────────────────────────────────────
 echo -e "${YELLOW}[3/6] Setting up Python environment...${NC}"
 [ ! -d "venv" ] && python3 -m venv venv
 source venv/bin/activate
@@ -40,19 +34,19 @@ pip install -q --upgrade pip 2>/dev/null
 pip install -q -r requirements.txt 2>/dev/null
 echo -e "${GREEN}  ✓ Done${NC}"
 
-# ── 4. Self-heal widgets.py ───────────────────────────────────────
 echo -e "${YELLOW}[4/6] Healing critical files...${NC}"
 
-# Check if widgets.py has all required classes
+# Detect broken widgets.py (wrong class, missing Btn, old __str__ proxy, _root bug)
 NEEDS_HEAL=false
-if ! python3 -m py_compile widgets.py 2>/dev/null; then NEEDS_HEAL=true; fi
-if ! grep -q "class Btn" widgets.py 2>/dev/null; then NEEDS_HEAL=true; fi
-if ! grep -q "class Card" widgets.py 2>/dev/null; then NEEDS_HEAL=true; fi
-if ! grep -q "class ScrollableFrame" widgets.py 2>/dev/null; then NEEDS_HEAL=true; fi
-if grep -q "def __str__" widgets.py 2>/dev/null; then NEEDS_HEAL=true; fi  # old broken proxy
+python3 -m py_compile widgets.py 2>/dev/null || NEEDS_HEAL=true
+grep -q "class Btn"           widgets.py 2>/dev/null || NEEDS_HEAL=true
+grep -q "class Card"          widgets.py 2>/dev/null || NEEDS_HEAL=true
+grep -q "def __str__"         widgets.py 2>/dev/null && NEEDS_HEAL=true
+grep -q "self\._root ="       widgets.py 2>/dev/null && NEEDS_HEAL=true
+grep -q "CTkScrollableFrame"  widgets.py 2>/dev/null || NEEDS_HEAL=true
 
 if [ "$NEEDS_HEAL" = true ]; then
-    echo -e "  ${YELLOW}widgets.py needs healing — rewriting...${NC}"
+    echo -e "  ${YELLOW}widgets.py healing...${NC}"
     python3 << 'WIDGETS_HEREDOC'
 """
 Mint Scan v7 — Shared Widgets
@@ -124,17 +118,16 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
 
     def _on_enter(self, event=None):
         # Bind to root window so scroll works anywhere inside
-        self._root = self.winfo_toplevel()
-        self._root.bind_all('<MouseWheel>', self._on_mousewheel, add='+')
-        self._root.bind_all('<Button-4>',   self._scroll_up,    add='+')
-        self._root.bind_all('<Button-5>',   self._scroll_down,  add='+')
+        self._toplevel = self.winfo_toplevel()
+        self._toplevel.bind_all('<MouseWheel>', self._on_mousewheel, add='+')
+        self._toplevel.bind_all('<Button-4>',   self._scroll_up,    add='+')
+        self._toplevel.bind_all('<Button-5>',   self._scroll_down,  add='+')
 
     def _on_leave(self, event=None):
         try:
-            root = self.winfo_toplevel()
-            root.unbind_all('<MouseWheel>')
-            root.unbind_all('<Button-4>')
-            root.unbind_all('<Button-5>')
+            self._toplevel.unbind_all('<MouseWheel>')
+            self._toplevel.unbind_all('<Button-4>')
+            self._toplevel.unbind_all('<Button-5>')
         except Exception:
             pass
 
@@ -376,17 +369,17 @@ class PortBar(ctk.CTkFrame):
         ).pack(anchor='w', padx=10, pady=(0, 6))
 
 WIDGETS_HEREDOC
-    python3 -c 'import sys; sys.path.insert(0,"."); from widgets import Btn, Card, ScrollableFrame; print("  \033[0;32m✓ widgets.py healed\033[0m")'
+    echo -e "  \033[0;32m✓ widgets.py healed\033[0m"
 else
     echo -e "  \033[0;32m✓ widgets.py OK\033[0m"
 fi
 
-# Heal main.py
-if ! grep -q "apply_theme" main.py 2>/dev/null; then
-    echo -e "  ${YELLOW}main.py: healing...${NC}"
+# Heal main.py if missing theme support
+grep -q "apply_theme" main.py 2>/dev/null || {
+    echo -e "  ${YELLOW}main.py healing...${NC}"
     cat > main.py << 'MAINEOF'
 #!/usr/bin/env python3
-"""Mint Scan v7 — Entry point with theme loading"""
+"""Mint Scan v7 — Entry point"""
 import sys, os, json
 BASE = os.path.dirname(os.path.abspath(__file__))
 if BASE not in sys.path: sys.path.insert(0, BASE)
@@ -404,9 +397,8 @@ if __name__ == '__main__':
     MintScanApp().run()
 MAINEOF
     echo -e "  ${GREEN}✓ main.py healed${NC}"
-fi
+}
 
-# ── 5. Verify all Python files ────────────────────────────────────
 echo -e "${YELLOW}[5/6] Verifying Python files...${NC}"
 errors=0
 for pyfile in *.py; do
@@ -420,7 +412,6 @@ for pyfile in *.py; do
 done
 [ $errors -gt 0 ] && echo -e "  ${RED}WARNING: $errors file(s) have errors${NC}"
 
-# Final widget import test
 WIDGET_OK=$(python3 -c "
 import sys; sys.path.insert(0,'.')
 try:
@@ -429,13 +420,10 @@ try:
 except Exception as e:
     print(f'FAIL: {e}')
 " 2>&1)
-if [ "$WIDGET_OK" = "OK" ]; then
-    echo -e "  ${GREEN}✓ All widget classes verified${NC}"
-else
-    echo -e "  ${RED}✗ Widget check: $WIDGET_OK${NC}"
-fi
+[ "$WIDGET_OK" = "OK" ] \
+    && echo -e "  ${GREEN}✓ All widget classes verified${NC}" \
+    || echo -e "  ${RED}✗ $WIDGET_OK${NC}"
 
-# ── 6. Desktop shortcut ───────────────────────────────────────────
 echo -e "${YELLOW}[6/6] Creating desktop shortcut...${NC}"
 mkdir -p ~/.local/share/applications
 cat > ~/.local/share/applications/mint-scan.desktop << DESKTOP
@@ -456,6 +444,5 @@ echo -e "${GREEN}${BOLD}"
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║   INSTALLATION COMPLETE                                     ║"
 echo "║   Run:  bash run.sh                                         ║"
-echo "║   Or:   source venv/bin/activate && python3 main.py        ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"

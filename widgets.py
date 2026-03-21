@@ -68,17 +68,16 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
 
     def _on_enter(self, event=None):
         # Bind to root window so scroll works anywhere inside
-        self._root = self.winfo_toplevel()
-        self._root.bind_all('<MouseWheel>', self._on_mousewheel, add='+')
-        self._root.bind_all('<Button-4>',   self._scroll_up,    add='+')
-        self._root.bind_all('<Button-5>',   self._scroll_down,  add='+')
+        self._toplevel = self.winfo_toplevel()
+        self._toplevel.bind_all('<MouseWheel>', self._on_mousewheel, add='+')
+        self._toplevel.bind_all('<Button-4>',   self._scroll_up,    add='+')
+        self._toplevel.bind_all('<Button-5>',   self._scroll_down,  add='+')
 
     def _on_leave(self, event=None):
         try:
-            root = self.winfo_toplevel()
-            root.unbind_all('<MouseWheel>')
-            root.unbind_all('<Button-4>')
-            root.unbind_all('<Button-5>')
+            self._toplevel.unbind_all('<MouseWheel>')
+            self._toplevel.unbind_all('<Button-4>')
+            self._toplevel.unbind_all('<Button-5>')
         except Exception:
             pass
 
