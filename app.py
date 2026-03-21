@@ -3,36 +3,23 @@ Mint Scan v7 — Main Application
 Full GUI desktop security auditor for Linux
 """
 import tkinter as tk
-from tkinter import ttk
 import customtkinter as ctk
 import threading
 import time
 import sys
 import os
 
-# Dark theme
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
-# Colour palette
 C = {
-    'bg':   '#020c14',
-    'sf':   '#061523',
-    's2':   '#0a1e2e',
-    'br':   '#0d2a3d',
-    'br2':  '#1a3a52',
-    'ac':   '#00ffe0',
-    'wn':   '#ff4c4c',
-    'am':   '#ffb830',
-    'ok':   '#39ff88',
-    'bl':   '#4d9fff',
-    'pu':   '#c084fc',
-    'tx':   '#c8e8f4',
-    'mu':   '#3a6278',
-    'mu2':  '#5a8298',
+    'bg':  '#020c14', 'sf':  '#061523', 's2':  '#0a1e2e',
+    'br':  '#0d2a3d', 'br2': '#1a3a52', 'ac':  '#00ffe0',
+    'wn':  '#ff4c4c', 'am':  '#ffb830', 'ok':  '#39ff88',
+    'bl':  '#4d9fff', 'pu':  '#c084fc', 'tx':  '#c8e8f4',
+    'mu':  '#3a6278', 'mu2': '#5a8298',
 }
-
-MONO = ('Courier', 10)
+MONO    = ('Courier', 10)
 MONO_SM = ('Courier', 9)
 MONO_LG = ('Courier', 14)
 MONO_XL = ('Courier', 28, 'bold')
@@ -46,7 +33,7 @@ BOOT_LINES = [
     "BUILDING THREAT ENGINE...",
     "LOADING CALL LOG READER...",
     "READING SYSTEM NOTIFICATIONS...",
-    "✓ ALL SYSTEMS READY.",
+    "ALL SYSTEMS READY.",
 ]
 
 
@@ -58,45 +45,42 @@ class MintScanApp:
         self.root.minsize(900, 600)
         self.root.configure(fg_color=C['bg'])
 
-        # Set window icon if available
+        # App icon
         try:
-            icon_path = os.path.join(os.path.dirname(__file__), '..', 'assets', 'icon.png')
-            if os.path.exists(icon_path):
-                img = tk.PhotoImage(file=icon_path)
-                self.root.iconphoto(True, img)
+            base = os.path.dirname(os.path.abspath(__file__))
+            for name in ['icon.png', 'icon_128.png', 'icon_256.png']:
+                p = os.path.join(base, name)
+                if os.path.exists(p):
+                    img = tk.PhotoImage(file=p)
+                    self.root.iconphoto(True, img)
+                    break
         except Exception:
             pass
 
         self.current_tab = tk.StringVar(value='dash')
-        self._frames = {}
-
-        # Show boot screen first
+        self._frames   = {}
+        self._tab_btns = {}
         self._show_boot()
 
     def _show_boot(self):
         self.boot_frame = ctk.CTkFrame(self.root, fg_color=C['bg'], corner_radius=0)
         self.boot_frame.pack(fill='both', expand=True)
-
         inner = ctk.CTkFrame(self.boot_frame, fg_color='transparent')
         inner.place(relx=0.5, rely=0.5, anchor='center')
-
         ctk.CTkLabel(inner, text="[ MINT SCAN ]",
                      font=('Courier', 32, 'bold'), text_color=C['ac']).pack(anchor='w')
-        ctk.CTkLabel(inner, text="SECURITY AUDITOR v7.0 — MINT PROJECTS",
-                     font=MONO_SM, text_color=C['mu']).pack(anchor='w', pady=(0, 20))
-
+        ctk.CTkLabel(inner, text="SECURITY AUDITOR v7.0  |  MINT PROJECTS",
+                     font=MONO_SM, text_color=C['mu']).pack(anchor='w', pady=(0,20))
         self.boot_log = ctk.CTkTextbox(inner, width=480, height=220,
                                        font=MONO_SM, fg_color=C['bg'],
                                        text_color=C['ac'], border_width=0)
         self.boot_log.pack()
-
         self._boot_idx = 0
         self._animate_boot()
 
     def _animate_boot(self):
         if self._boot_idx < len(BOOT_LINES):
             line = BOOT_LINES[self._boot_idx]
-            color = C['ok'] if line.startswith('✓') else C['ac']
             self.boot_log.configure(state='normal')
             self.boot_log.insert('end', line + '\n')
             self.boot_log.configure(state='disabled')
@@ -110,120 +94,115 @@ class MintScanApp:
         self._build_ui()
 
     def _build_ui(self):
-        # ── Top nav bar ──
-        self.navbar = ctk.CTkFrame(self.root, height=52, fg_color=C['sf'],
-                                   corner_radius=0)
+        # ── Navbar ───────────────────────────────────────────
+        self.navbar = ctk.CTkFrame(self.root, height=52,
+                                   fg_color=C['sf'], corner_radius=0)
         self.navbar.pack(fill='x', side='top')
         self.navbar.pack_propagate(False)
-
         ctk.CTkLabel(self.navbar, text="[ MINT SCAN ]",
-                     font=('Courier', 15, 'bold'), text_color=C['ac']
+                     font=('Courier',15,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         ctk.CTkLabel(self.navbar, text="v7.0",
-                     font=MONO_SM, text_color=C['mu']
-                     ).pack(side='left', padx=2)
-
+                     font=MONO_SM, text_color=C['mu']).pack(side='left', padx=2)
         self.clock_lbl = ctk.CTkLabel(self.navbar, text="--:--:--",
                                        font=MONO_SM, text_color=C['mu'])
         self.clock_lbl.pack(side='right', padx=16)
-
-        self.score_lbl = ctk.CTkLabel(self.navbar, text="SCORE: —",
-                                       font=('Courier', 11, 'bold'), text_color=C['ok'])
+        self.score_lbl = ctk.CTkLabel(self.navbar, text="SCORE: --",
+                                       font=('Courier',11,'bold'), text_color=C['ok'])
         self.score_lbl.pack(side='right', padx=12)
 
-        # ── Sidebar tabs ──
-        self.sidebar = ctk.CTkFrame(self.root, width=160, fg_color=C['sf'],
-                                    corner_radius=0)
+        # ── Sidebar ───────────────────────────────────────────
+        self.sidebar = ctk.CTkFrame(self.root, width=162,
+                                    fg_color=C['sf'], corner_radius=0)
         self.sidebar.pack(fill='y', side='left')
         self.sidebar.pack_propagate(False)
 
-        self._tab_btns = {}
-        for label, key in TABS:
-            btn = ctk.CTkButton(
-                self.sidebar, text=label,
-                font=('Courier', 10), height=42,
-                fg_color='transparent', hover_color=C['br'],
-                text_color=C['mu'], anchor='w',
-                corner_radius=0,
-                command=lambda k=key: self._switch_tab(k)
-            )
-            btn.pack(fill='x', pady=1, padx=4)
-            self._tab_btns[key] = btn
-
-        ctk.CTkLabel(self.sidebar, text="MINT PROJECTS",
-                     font=('Courier', 8), text_color=C['mu']
-                     ).pack(side='bottom', pady=8)
-
-        # ── Main content area ──
+        # ── Content ───────────────────────────────────────────
         self.content = ctk.CTkFrame(self.root, fg_color=C['bg'], corner_radius=0)
         self.content.pack(fill='both', expand=True, side='left')
 
-        # Import all screens with safe fallback
+        # ── Load screens ──────────────────────────────────────
+        # Add this file's directory to path so all screens resolve
         import importlib as _il
-        import sys as _sys
         _base = os.path.dirname(os.path.abspath(__file__))
-        if _base not in _sys.path: _sys.path.insert(0, _base)
+        if _base not in sys.path:
+            sys.path.insert(0, _base)
 
-        from dash    import DashScreen
-        from perms   import PermsScreen
-        from wifi    import WifiScreen
-        from calls   import CallsScreen
-        from network import NetworkScreen
-        from battery import BatteryScreen
-        from threats import ThreatsScreen
-        from notifs  import NotifsScreen
-        from ports   import PortsScreen
-
-        def _si(mod, cls):
-            try: return getattr(_il.import_module(mod), cls)
+        def _safe(mod, cls):
+            try:
+                return getattr(_il.import_module(mod), cls)
             except Exception as e:
-                print(f"  Note: {mod} unavailable ({e})")
+                print(f"  [skip] {mod}: {e}")
                 return None
 
-        UsbScreen      = _si('usb',         'UsbScreen')
-        ApkScreen      = _si('apk_install', 'ApkScreen')
-        NetScanScreen  = _si('netscan',     'NetScanScreen')
-        MalwareScreen  = _si('malware',     'MalwareScreen')
-        SysFixScreen   = _si('sysfix',      'SysFixScreen')
-        SettingsScreen = _si('settings',    'SettingsScreen')
+        # Core screens
+        DashScreen    = _safe('dash',    'DashScreen')
+        PermsScreen   = _safe('perms',   'PermsScreen')
+        WifiScreen    = _safe('wifi',    'WifiScreen')
+        CallsScreen   = _safe('calls',   'CallsScreen')
+        NetworkScreen = _safe('network', 'NetworkScreen')
+        BatteryScreen = _safe('battery', 'BatteryScreen')
+        ThreatsScreen = _safe('threats', 'ThreatsScreen')
+        NotifsScreen  = _safe('notifs',  'NotifsScreen')
+        PortsScreen   = _safe('ports',   'PortsScreen')
+        # Extended screens
+        UsbScreen      = _safe('usb',         'UsbScreen')
+        ApkScreen      = _safe('apk_install', 'ApkScreen')
+        NetScanScreen  = _safe('netscan',     'NetScanScreen')
+        MalwareScreen  = _safe('malware',     'MalwareScreen')
+        SysFixScreen   = _safe('sysfix',      'SysFixScreen')
+        SettingsScreen  = _safe('settings',   'SettingsScreen')
+        WirelessScreen  = _safe('wireless',   'WirelessScreen')
 
+        # screen_classes: only include screens that loaded
         _all_screens = [
-            ('dash',    DashScreen),    ('perms',    PermsScreen),
-            ('wifi',    WifiScreen),    ('calls',    CallsScreen),
-            ('network', NetworkScreen), ('battery',  BatteryScreen),
-            ('threats', ThreatsScreen), ('notifs',   NotifsScreen),
-            ('ports',   PortsScreen),   ('usb',      UsbScreen),
-            ('apk',     ApkScreen),     ('netscan',  NetScanScreen),
-            ('malware', MalwareScreen), ('sysfix',   SysFixScreen),
-            ('settings',SettingsScreen),
+            ('dash',     DashScreen),
+            ('perms',    PermsScreen),
+            ('wifi',     WifiScreen),
+            ('calls',    CallsScreen),
+            ('network',  NetworkScreen),
+            ('battery',  BatteryScreen),
+            ('threats',  ThreatsScreen),
+            ('notifs',   NotifsScreen),
+            ('ports',    PortsScreen),
+            ('usb',      UsbScreen),
+            ('apk',      ApkScreen),
+            ('netscan',  NetScanScreen),
+            ('malware',  MalwareScreen),
+            ('sysfix',   SysFixScreen),
+            ('settings',  SettingsScreen),
+            ('wireless',  WirelessScreen),
         ]
         screen_classes = {k: v for k, v in _all_screens if v is not None}
 
-        # Build TABS here — AFTER screen_classes is known — only include available screens
+        # ── TABS: built AFTER screen_classes ──────────────────
+        # This MUST stay below screen_classes — do not move up
         ALL_TABS = [
-            ('⬡ DASHBOARD',   'dash'),
-            ('🔑 PERMISSIONS', 'perms'),
-            ('📶 WI-FI',       'wifi'),
-            ('📞 CALLS',       'calls'),
-            ('📡 NETWORK',     'network'),
-            ('🔋 BATTERY',     'battery'),
-            ('⚠  THREATS',     'threats'),
-            ('🔔 NOTIFS',      'notifs'),
-            ('🔍 PORT SCAN',   'ports'),
-            ('📱 USB SYNC',    'usb'),
-            ('📦 APK INSTALL', 'apk'),
-            ('🔬 NET SCAN',    'netscan'),
-            ('🦠 MALWARE',     'malware'),
-            ('🔧 SYS FIX',     'sysfix'),
-            ('⚙  SETTINGS',    'settings'),
+            ('DASHBOARD',   'dash'),
+            ('PERMISSIONS', 'perms'),
+            ('WI-FI',       'wifi'),
+            ('CALLS',       'calls'),
+            ('NETWORK',     'network'),
+            ('BATTERY',     'battery'),
+            ('THREATS',     'threats'),
+            ('NOTIFS',      'notifs'),
+            ('PORT SCAN',   'ports'),
+            ('USB SYNC',    'usb'),
+            ('APK INSTALL', 'apk'),
+            ('NET SCAN',    'netscan'),
+            ('MALWARE',     'malware'),
+            ('SYS FIX',     'sysfix'),
+            ('SETTINGS',    'settings'),
+            ('WIFI SYNC',   'wireless'),
         ]
-        TABS = [(lbl, key) for lbl, key in ALL_TABS if key in screen_classes]
+        tabs = [(lbl, key) for lbl, key in ALL_TABS if key in screen_classes]
 
+        # ── Sidebar buttons ───────────────────────────────────
         self._tab_btns = {}
-        for label, key in TABS:
+        for label, key in tabs:
             btn = ctk.CTkButton(
                 self.sidebar, text=label,
-                font=('Courier', 10), height=42,
+                font=('Courier', 9), height=40,
                 fg_color='transparent', hover_color=C['br'],
                 text_color=C['mu'], anchor='w',
                 corner_radius=0,
@@ -233,33 +212,38 @@ class MintScanApp:
             self._tab_btns[key] = btn
 
         ctk.CTkLabel(self.sidebar, text="MINT PROJECTS",
-                     font=('Courier', 8), text_color=C['mu']
+                     font=('Courier', 7), text_color=C['mu']
                      ).pack(side='bottom', pady=8)
 
+        # ── Instantiate screens ───────────────────────────────
         for key, cls in screen_classes.items():
-            frame = cls(self.content, self)
-            frame.place(relwidth=1, relheight=1)
-            self._frames[key] = frame
+            try:
+                frame = cls(self.content, self)
+                frame.place(relwidth=1, relheight=1)
+                self._frames[key] = frame
+            except Exception as e:
+                print(f"  [error] Could not build {key}: {e}")
 
-        # Start on dash
-        self._switch_tab('dash')
+        # Start on dashboard
+        if 'dash' in self._frames:
+            self._switch_tab('dash')
+        elif self._frames:
+            self._switch_tab(next(iter(self._frames)))
 
-        # Clock
         self._tick_clock()
 
     def _switch_tab(self, key):
-        # Hide all
+        if key not in self._frames:
+            return
         for frame in self._frames.values():
             frame.place_forget()
-        # Show selected
         self._frames[key].place(relwidth=1, relheight=1)
         self._frames[key].on_focus()
-        # Update sidebar
         for k, btn in self._tab_btns.items():
-            if k == key:
-                btn.configure(text_color=C['ac'], fg_color=C['br'])
-            else:
-                btn.configure(text_color=C['mu'], fg_color='transparent')
+            btn.configure(
+                text_color=C['ac'] if k == key else C['mu'],
+                fg_color=C['br'] if k == key else 'transparent'
+            )
         self.current_tab.set(key)
 
     def _tick_clock(self):

@@ -2,6 +2,7 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, subprocess, os, re, time
+from installer import install_all_tools
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 
 

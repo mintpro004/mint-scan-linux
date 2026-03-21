@@ -3,6 +3,7 @@ import tkinter as tk
 import customtkinter as ctk
 import threading, time, subprocess
 from utils import C, MONO, MONO_SM, run_cmd
+from installer import install_kdeconnect
 from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn
 
 
@@ -73,7 +74,7 @@ class NotifsScreen(ctk.CTkFrame):
         btn_row = ctk.CTkFrame(kde_card, fg_color='transparent')
         btn_row.pack(fill='x', padx=12, pady=(0,10))
         Btn(btn_row, "INSTALL: sudo apt install kdeconnect",
-            command=lambda: run_cmd('x-terminal-emulator -e "sudo apt install kdeconnect -y"'),
+            command=lambda: install_kdeconnect(self),
             variant='blue', width=360).pack(side='left')
 
     def _toggle_monitor(self):

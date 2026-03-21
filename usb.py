@@ -2,6 +2,7 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, subprocess, os, time, re
+from installer import install_adb
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 
 
@@ -306,5 +307,5 @@ class UsbScreen(ctk.CTkFrame):
         self._log("✓ Full sync complete. Files saved to home directory.")
 
     def _install_adb(self):
-        subprocess.Popen(['x-terminal-emulator', '-e',
-                         'bash -c "sudo apt install -y adb && echo Done; read"'])
+        install_adb(self, on_done=lambda: self.after(500,
+            threading.Thread(target=self._detect, daemon=True).start))

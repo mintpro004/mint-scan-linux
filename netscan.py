@@ -2,6 +2,7 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, subprocess, re, time, os
+from installer import install_nmap
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 
 

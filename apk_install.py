@@ -2,6 +2,7 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, subprocess, os, re, time
+from installer import install_adb
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 
 
@@ -296,5 +297,5 @@ class ApkScreen(ctk.CTkFrame):
             self.after(0, self._log, "No packages found or permission denied")
 
     def _install_adb(self):
-        subprocess.Popen(['x-terminal-emulator', '-e',
-                         'bash -c "sudo apt install -y adb && echo Done; read"'])
+        install_adb(self, on_done=lambda: self.after(500,
+            threading.Thread(target=self._detect_device, daemon=True).start))

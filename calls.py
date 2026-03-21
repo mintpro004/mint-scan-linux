@@ -4,6 +4,7 @@ import customtkinter as ctk
 import threading
 import os, re
 from utils import C, MONO, MONO_SM, run_cmd, analyse_phone_number, SA_OPERATORS
+from installer import install_kdeconnect
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 
 
