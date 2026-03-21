@@ -1,15 +1,16 @@
 #!/bin/bash
-# Mint Scan v7 — Launcher with self-healing check
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Quick self-heal: if widgets.py is broken, fix ownership and reinstall
-if [ ! -f "venv/bin/activate" ] || ! python3 -m py_compile widgets.py 2>/dev/null || ! grep -q "class Btn" widgets.py; then
-    echo "[ MINT SCAN ] Detecting issue — running self-heal..."
+# Self-heal: if widgets broken, reinstall first
+if ! python3 -m py_compile widgets.py 2>/dev/null || \
+   ! grep -q "class Btn" widgets.py 2>/dev/null || \
+   grep -q "def __str__" widgets.py 2>/dev/null; then
+    echo "[ MINT SCAN ] Detected broken widgets.py — self-healing..."
     sudo chown -R "$USER:$USER" "$SCRIPT_DIR" 2>/dev/null || true
     bash install.sh
-    exit $?
 fi
 
+[ ! -d "venv" ] && bash install.sh
 source venv/bin/activate
 exec python3 main.py
