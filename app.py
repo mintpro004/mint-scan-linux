@@ -137,27 +137,6 @@ class MintScanApp:
         self.sidebar.pack(fill='y', side='left')
         self.sidebar.pack_propagate(False)
 
-        TABS = [
-            ('⬡ DASHBOARD',  'dash'),
-            ('🔑 PERMISSIONS','perms'),
-            ('📶 WI-FI',      'wifi'),
-            ('📞 CALLS',      'calls'),
-            ('📡 NETWORK',    'network'),
-            ('🔋 BATTERY',    'battery'),
-            ('⚠  THREATS',    'threats'),
-            ('🔔 NOTIFS',     'notifs'),
-            ('🔍 PORT SCAN',  'ports'),
-            ('📱 USB SYNC',   'usb'),
-            ('📦 APK INSTALL','apk'),
-            ('🔬 NET SCAN',   'netscan'),
-            ('🦠 MALWARE',    'malware'),
-            ('🔧 SYS FIX',    'sysfix'),
-            ('⚙  SETTINGS',   'settings'),
-        ]
-
-        # Filter tabs to only show available screens
-        TABS = [t for t in TABS if t[1] in screen_classes]
-
         self._tab_btns = {}
         for label, key in TABS:
             btn = ctk.CTkButton(
@@ -219,6 +198,43 @@ class MintScanApp:
             ('settings',SettingsScreen),
         ]
         screen_classes = {k: v for k, v in _all_screens if v is not None}
+
+        # Build TABS here — AFTER screen_classes is known — only include available screens
+        ALL_TABS = [
+            ('⬡ DASHBOARD',   'dash'),
+            ('🔑 PERMISSIONS', 'perms'),
+            ('📶 WI-FI',       'wifi'),
+            ('📞 CALLS',       'calls'),
+            ('📡 NETWORK',     'network'),
+            ('🔋 BATTERY',     'battery'),
+            ('⚠  THREATS',     'threats'),
+            ('🔔 NOTIFS',      'notifs'),
+            ('🔍 PORT SCAN',   'ports'),
+            ('📱 USB SYNC',    'usb'),
+            ('📦 APK INSTALL', 'apk'),
+            ('🔬 NET SCAN',    'netscan'),
+            ('🦠 MALWARE',     'malware'),
+            ('🔧 SYS FIX',     'sysfix'),
+            ('⚙  SETTINGS',    'settings'),
+        ]
+        TABS = [(lbl, key) for lbl, key in ALL_TABS if key in screen_classes]
+
+        self._tab_btns = {}
+        for label, key in TABS:
+            btn = ctk.CTkButton(
+                self.sidebar, text=label,
+                font=('Courier', 10), height=42,
+                fg_color='transparent', hover_color=C['br'],
+                text_color=C['mu'], anchor='w',
+                corner_radius=0,
+                command=lambda k=key: self._switch_tab(k)
+            )
+            btn.pack(fill='x', pady=1, padx=4)
+            self._tab_btns[key] = btn
+
+        ctk.CTkLabel(self.sidebar, text="MINT PROJECTS",
+                     font=('Courier', 8), text_color=C['mu']
+                     ).pack(side='bottom', pady=8)
 
         for key, cls in screen_classes.items():
             frame = cls(self.content, self)
