@@ -1,9 +1,16 @@
-"""Wi-Fi Scanner Screen — real nmcli/iwlist scanning"""
+"""Wi-Fi Scanner — live scan, VPN detection, saved networks, stop/start"""
 import tkinter as tk
 import customtkinter as ctk
-import threading
-from utils import C, MONO, MONO_SM, get_wifi_networks, get_current_wifi, get_wifi_interface, get_network_interfaces
-from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
+import threading, subprocess, re, os
+from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
+
+
+def run(cmd, timeout=15):
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        return r.stdout.strip(), r.stderr.strip(), r.returncode
+    except Exception as e:
+        return '', str(e), 1
 
 
 def sig_color(sig):
@@ -13,205 +20,277 @@ def sig_color(sig):
     return C['wn']
 
 def sec_color(sec):
-    sec = sec.upper()
-    if 'WPA3' in sec: return C['ok']
-    if 'WPA2' in sec: return C['ac']
-    if 'WPA'  in sec: return C['am']
-    if 'WEP'  in sec: return C['wn']
-    return C['wn']  # OPEN
+    s = sec.upper()
+    if 'WPA3' in s: return C['ok']
+    if 'WPA2' in s: return C['ac']
+    if 'WPA'  in s: return C['am']
+    if 'WEP'  in s: return C['wn']
+    return C['wn']
 
 
 class WifiScreen(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
-        self._built = False
+        self._built    = False
+        self._scanning = False
 
     def on_focus(self):
         if not self._built:
             self._build()
             self._built = True
+        threading.Thread(target=self._load_current, daemon=True).start()
 
     def _build(self):
-        # Header
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="📶  WI-FI SCANNER", font=('Courier', 13, 'bold'),
+        ctk.CTkLabel(hdr, text="📶  WI-FI SCANNER", font=('Courier',13,'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
-        self.status_lbl = ctk.CTkLabel(hdr, text="Idle", font=MONO_SM,
-                                        text_color=C['mu'])
+        self.status_lbl = ctk.CTkLabel(hdr, text="Idle", font=MONO_SM, text_color=C['mu'])
         self.status_lbl.pack(side='left', padx=8)
-        self.scan_btn = Btn(hdr, "📡  SCAN NOW", command=self._scan, width=130)
-        self.scan_btn.pack(side='right', padx=12, pady=6)
+        self.stop_btn = Btn(hdr, "⏹ STOP", command=self._stop_scan, variant='danger', width=90)
+        self.stop_btn.pack(side='right', padx=4, pady=6)
+        self.stop_btn.configure(state='disabled')
+        self.scan_btn = Btn(hdr, "▶ SCAN", command=self._start_scan, width=90)
+        self.scan_btn.pack(side='right', padx=4, pady=6)
 
         self.scroll = ScrollableFrame(self)
         self.scroll.pack(fill='both', expand=True)
         body = self.scroll
 
-        # Current connection
-        SectionHeader(body, '01', 'CURRENT CONNECTION').pack(
-            fill='x', padx=14, pady=(14, 4))
+        SectionHeader(body, '01', 'CURRENT CONNECTION').pack(fill='x', padx=14, pady=(14,4))
         self.curr_card = Card(body)
-        self.curr_card.pack(fill='x', padx=14, pady=(0, 6))
+        self.curr_card.pack(fill='x', padx=14, pady=(0,6))
         self.curr_info = InfoGrid(self.curr_card, [
-            ('STATUS', '—'), ('INTERFACE', '—'), ('SSID', '—'), ('LOCAL IP', '—')
-        ], columns=4)
+            ('STATUS','—'),('TYPE','—'),('SSID','—'),('LOCAL IP','—')], columns=4)
         self.curr_info.pack(fill='x', padx=4, pady=4)
 
-        # Scan results container
-        SectionHeader(body, '02', 'NEARBY NETWORKS').pack(
-            fill='x', padx=14, pady=(10, 4))
-        self.results_frame = ctk.CTkFrame(body, fg_color='transparent')
-        self.results_frame.pack(fill='x', padx=14)
+        SectionHeader(body, '02', 'VPN / TUNNEL DETECTION').pack(fill='x', padx=14, pady=(10,4))
+        self.vpn_card = Card(body)
+        self.vpn_card.pack(fill='x', padx=14, pady=(0,6))
+        ctk.CTkLabel(self.vpn_card, text="Tap ▶ SCAN to check for VPN interfaces",
+                     font=MONO_SM, text_color=C['mu']).pack(padx=12, pady=10)
 
-        self.hint = ctk.CTkLabel(self.results_frame,
-                                  text="Tap SCAN NOW to discover all Wi-Fi networks in range.\n"
-                                       "Uses nmcli (NetworkManager) for real live scanning.",
-                                  font=MONO_SM, text_color=C['mu'])
-        self.hint.pack(pady=20)
+        SectionHeader(body, '03', 'YOUR SAVED NETWORKS').pack(fill='x', padx=14, pady=(10,4))
+        self.saved_frame = ctk.CTkFrame(body, fg_color='transparent')
+        self.saved_frame.pack(fill='x', padx=14, pady=(0,6))
+        ctk.CTkLabel(self.saved_frame, text="Tap ▶ SCAN to load saved networks",
+                     font=MONO_SM, text_color=C['mu']).pack(pady=8)
 
-        # Load current connection immediately
-        threading.Thread(target=self._load_current, daemon=True).start()
+        SectionHeader(body, '04', 'NEARBY NETWORKS').pack(fill='x', padx=14, pady=(10,4))
+        self.nearby_frame = ctk.CTkFrame(body, fg_color='transparent')
+        self.nearby_frame.pack(fill='x', padx=14, pady=(0,14))
+        ctk.CTkLabel(self.nearby_frame,
+                     text="Tap ▶ SCAN to discover all Wi-Fi networks in range",
+                     font=MONO_SM, text_color=C['mu']).pack(pady=20)
 
     def _load_current(self):
-        iface    = get_wifi_interface()
-        ssid     = get_current_wifi()
-        ifaces   = get_network_interfaces()
-        local_ip = next((i['ip4'] for i in ifaces if i['ip4'] != '—' and not i['ip4'].startswith('127')), '—')
-        self.after(0, self._render_current, iface, ssid, local_ip)
+        out, _, _    = run("nmcli -t -f TYPE,STATE dev 2>/dev/null | head -3")
+        ip_out, _, _ = run("ip route get 8.8.8.8 2>/dev/null | grep src | awk '{print $7}' | head -1")
+        ssid_out,_,_ = run("nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | cut -d: -f2 | head -1")
+        conn_type    = 'Wi-Fi' if 'wifi' in out.lower() else 'Ethernet' if 'ethernet' in out.lower() else 'Unknown'
+        connected    = 'connected' in out.lower()
+        self.after(0, self._render_current, conn_type, ssid_out, ip_out, connected)
 
-    def _render_current(self, iface, ssid, local_ip):
+    def _render_current(self, conn_type, ssid, ip, connected):
         self.curr_info.destroy()
-        connected = bool(ssid)
         self.curr_info = InfoGrid(self.curr_card, [
-            ('STATUS',    'CONNECTED' if connected else 'DISCONNECTED',
+            ('STATUS',  'CONNECTED' if connected else 'DISCONNECTED',
              C['ok'] if connected else C['wn']),
-            ('INTERFACE', iface or '—', C['ac']),
-            ('SSID',      ssid or 'Unknown', C['ok'] if connected else C['mu']),
-            ('LOCAL IP',  local_ip, C['am']),
+            ('TYPE',    conn_type,   C['ac']),
+            ('SSID',    ssid or '—', C['ok'] if ssid else C['mu']),
+            ('LOCAL IP',ip or '—',   C['am']),
         ], columns=4)
         self.curr_info.pack(fill='x', padx=4, pady=4)
 
-    def _scan(self):
+    def _start_scan(self):
+        if self._scanning: return
+        self._scanning = True
         self.scan_btn.configure(state='disabled', text='SCANNING...')
+        self.stop_btn.configure(state='normal')
         self.status_lbl.configure(text='Scanning...', text_color=C['ac'])
-        self.hint.destroy() if hasattr(self, 'hint') else None
-        # Clear old results
-        for w in self.results_frame.winfo_children():
-            w.destroy()
-        ctk.CTkLabel(self.results_frame, text="⟳  Scanning nearby networks...",
-                     font=MONO_SM, text_color=C['ac']).pack(pady=16)
-        threading.Thread(target=self._do_scan, daemon=True).start()
+        for w in self.nearby_frame.winfo_children(): w.destroy()
+        for w in self.saved_frame.winfo_children():  w.destroy()
+        ctk.CTkLabel(self.nearby_frame, text="⟳ Scanning...",
+                     font=MONO_SM, text_color=C['ac']).pack(pady=8)
+        threading.Thread(target=self._do_full_scan, daemon=True).start()
 
-    def _do_scan(self):
-        networks = get_wifi_networks()
+    def _stop_scan(self):
+        self._scanning = False
+        self.scan_btn.configure(state='normal', text='▶ SCAN')
+        self.stop_btn.configure(state='disabled')
+        self.status_lbl.configure(text='Stopped', text_color=C['mu'])
+
+    def _do_full_scan(self):
+        if not self._scanning: return
+
+        # VPN check
+        vpn_ifaces, vpn_procs = [], []
+        ifaces_out, _, _ = run("ip link show 2>/dev/null")
+        for iface in re.findall(r'\d+: (\w+):', ifaces_out):
+            if any(x in iface.lower() for x in ['tun','tap','wg','vpn','ppp','zt','tor']):
+                ip_out, _, _ = run(f"ip addr show {iface} 2>/dev/null | grep 'inet ' | awk '{{print $2}}'")
+                vpn_ifaces.append({'name': iface, 'ip': ip_out or '—'})
+        for proc in ['openvpn','wireguard','nordvpn','expressvpn','tailscale','zerotier']:
+            out, _, rc = run(f"pgrep -x {proc} 2>/dev/null")
+            if rc == 0: vpn_procs.append(proc)
+        self.after(0, self._render_vpn, vpn_ifaces, vpn_procs)
+        if not self._scanning: return
+
+        # Saved networks
+        saved_out, _, _ = run("nmcli -t -f NAME,TIMESTAMP-REAL connection show 2>/dev/null | head -30", timeout=8)
+        saved = []
+        for line in saved_out.split('\n'):
+            parts = line.split(':')
+            if len(parts) >= 2 and parts[0]:
+                saved.append({'name': parts[0], 'last': parts[-1]})
+        self.after(0, self._render_saved, saved)
+        if not self._scanning: return
+
+        # Rescan and list
+        run("nmcli device wifi rescan 2>/dev/null", timeout=5)
+        out, _, rc = run("nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null", timeout=15)
+        networks, seen = [], set()
+        if rc == 0 and out:
+            for line in out.strip().split('\n'):
+                if not line.strip(): continue
+                parts = line.split(':')
+                if len(parts) < 4: continue
+                ssid = parts[0] or '(hidden)'
+                bssid = parts[1] if len(parts) > 1 else '—'
+                try:    signal = int(parts[2]) if len(parts) > 2 else 0
+                except: signal = 0
+                security = parts[3] if len(parts) > 3 else '—'
+                channel  = parts[4] if len(parts) > 4 else '—'
+                freq     = parts[5] if len(parts) > 5 else '—'
+                key = ssid + bssid
+                if key not in seen:
+                    seen.add(key)
+                    networks.append({'ssid':ssid,'bssid':bssid,'signal':signal,
+                                     'security': 'OPEN' if not security or security=='--' else security,
+                                     'channel':channel,'freq':freq})
+        networks.sort(key=lambda x: -x['signal'])
         self.after(0, self._render_networks, networks)
+        self._scanning = False
+        self.after(0, lambda: (
+            self.scan_btn.configure(state='normal', text='↺ RESCAN'),
+            self.stop_btn.configure(state='disabled'),
+            self.status_lbl.configure(text=f"Found {len(networks)} networks", text_color=C['ok'])
+        ))
+
+    def _render_vpn(self, interfaces, procs):
+        for w in self.vpn_card.winfo_children(): w.destroy()
+        active = bool(interfaces or procs)
+        if active:
+            ResultBox(self.vpn_card,'info','🔒 VPN / TUNNEL ACTIVE',
+                      'Traffic is being routed through a VPN or tunnel.'
+                      ).pack(fill='x', padx=8, pady=(8,4))
+        else:
+            ResultBox(self.vpn_card,'ok','✓ NO VPN DETECTED',
+                      'No VPN, tunnel or proxy interfaces found.'
+                      ).pack(fill='x', padx=8, pady=(8,4))
+        items = [(v['name'].upper(), v['ip'], C['bl']) for v in interfaces]
+        items += [(p.upper(), 'Process active', C['bl']) for p in procs]
+        if items:
+            InfoGrid(self.vpn_card, items, columns=3).pack(fill='x', padx=8, pady=(0,8))
+        else:
+            ctk.CTkLabel(self.vpn_card, text="No tun/tap/wg/ppp/zerotier interfaces active",
+                         font=MONO_SM, text_color=C['mu']).pack(padx=12, pady=(0,8))
+
+    def _render_saved(self, saved):
+        for w in self.saved_frame.winfo_children(): w.destroy()
+        if not saved:
+            ctk.CTkLabel(self.saved_frame,
+                         text="No saved networks found. Connect to Wi-Fi to populate this list.",
+                         font=MONO_SM, text_color=C['mu']).pack(pady=8)
+            return
+        ctk.CTkLabel(self.saved_frame, text=f"{len(saved)} saved network(s):",
+                     font=('Courier',9,'bold'), text_color=C['ac']).pack(anchor='w', pady=(0,4))
+        for net in saved[:20]:
+            row = ctk.CTkFrame(self.saved_frame, fg_color=C['sf'],
+                                border_color=C['br'], border_width=1, corner_radius=8)
+            row.pack(fill='x', pady=2)
+            ctk.CTkLabel(row, text='🔒', font=('Courier',16)).pack(side='left', padx=10, pady=8)
+            info = ctk.CTkFrame(row, fg_color='transparent')
+            info.pack(side='left', fill='both', expand=True, pady=8)
+            ctk.CTkLabel(info, text=net['name'], font=('Courier',11,'bold'),
+                         text_color=C['tx']).pack(anchor='w')
+            ctk.CTkLabel(info, text=f"Last: {net['last']}", font=('Courier',8),
+                         text_color=C['mu']).pack(anchor='w')
+            Btn(row, "SHOW PWD", command=lambda n=net['name']: self._show_password(n),
+                variant='ghost', width=90).pack(side='right', padx=8)
+
+    def _show_password(self, name):
+        out, _, rc = run(f"sudo nmcli -s -g 802-11-wireless-security.psk connection show '{name}' 2>/dev/null")
+        popup = ctk.CTkToplevel(self)
+        popup.title(f"Password: {name}")
+        popup.geometry("420x160")
+        popup.configure(fg_color=C['bg'])
+        if rc == 0 and out.strip():
+            ctk.CTkLabel(popup, text=name, font=('Courier',12,'bold'),
+                         text_color=C['ac']).pack(pady=(12,4))
+            e = ctk.CTkEntry(popup, font=('Courier',13,'bold'),
+                             fg_color=C['s2'], border_color=C['ac'], text_color=C['ok'])
+            e.pack(fill='x', padx=20, pady=8)
+            e.insert(0, out.strip())
+        else:
+            ctk.CTkLabel(popup,
+                text=f"Cannot read: {name}\n\nRun with sudo for password access:\n  sudo python3 main.py",
+                font=MONO_SM, text_color=C['mu'], justify='center').pack(expand=True)
+        Btn(popup, "CLOSE", command=popup.destroy, variant='ghost').pack(pady=4)
 
     def _render_networks(self, networks):
-        for w in self.results_frame.winfo_children():
-            w.destroy()
-
+        for w in self.nearby_frame.winfo_children(): w.destroy()
         if not networks:
-            ResultBox(self.results_frame, 'warn',
-                      '⚠ NO NETWORKS FOUND',
-                      'Make sure Wi-Fi is enabled and NetworkManager is running.\n'
-                      'Try: sudo nmcli device wifi rescan'
-                      ).pack(fill='x', pady=4)
-            self.scan_btn.configure(state='normal', text='📡  SCAN NOW')
-            self.status_lbl.configure(text='No networks found', text_color=C['wn'])
+            ResultBox(self.nearby_frame,'warn','⚠ NO NETWORKS FOUND',
+                      'Make sure Wi-Fi is on. Try: sudo nmcli device wifi rescan'
+                      ).pack(fill='x')
             return
-
-        open_nets = [n for n in networks if n['security'].upper() == 'OPEN']
+        open_nets = [n for n in networks if n['security'].upper()=='OPEN']
         wep_nets  = [n for n in networks if 'WEP' in n['security'].upper()]
-
-        # Summary card
-        summary = Card(self.results_frame,
-                       accent=C['wn'] if open_nets else C['ok'])
-        summary.pack(fill='x', pady=(0, 8))
-        InfoGrid(summary, [
-            ('FOUND',    len(networks),        C['ac']),
-            ('OPEN',     len(open_nets),        C['wn'] if open_nets else C['ok']),
-            ('WEP',      len(wep_nets),         C['wn'] if wep_nets  else C['ok']),
-            ('SECURE',   len(networks) - len(open_nets) - len(wep_nets), C['ok']),
-        ], columns=4).pack(fill='x', padx=4, pady=4)
-
+        summary   = Card(self.nearby_frame, accent=C['wn'] if open_nets else C['ok'])
+        summary.pack(fill='x', pady=(0,8))
+        InfoGrid(summary,[('FOUND',len(networks),C['ac']),('OPEN',len(open_nets),
+                C['wn'] if open_nets else C['ok']),('WEP',len(wep_nets),
+                C['wn'] if wep_nets else C['ok']),
+                ('SECURE',len(networks)-len(open_nets)-len(wep_nets),C['ok'])],
+                columns=4).pack(fill='x', padx=4, pady=4)
         if open_nets:
-            ResultBox(summary, 'warn',
-                      f'⚠ {len(open_nets)} OPEN NETWORK(S) IN RANGE',
-                      'Unencrypted networks visible. Avoid banking or sensitive logins on these.'
-                      ).pack(fill='x', padx=8, pady=(0, 8))
-
-        # Network rows
-        current_ssid = get_current_wifi()
+            ResultBox(summary,'warn',f'⚠ {len(open_nets)} OPEN NETWORK(S) — NO ENCRYPTION',
+                      'Avoid banking or sensitive data on these.'
+                      ).pack(fill='x', padx=8, pady=(0,8))
+        curr,_,_ = run("nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | cut -d: -f2 | head -1")
         for net in networks:
-            self._make_net_row(net, net['ssid'] == current_ssid)
-
-        self.scan_btn.configure(state='normal', text='↺  RESCAN')
-        self.status_lbl.configure(
-            text=f"Found {len(networks)} networks", text_color=C['ok'])
-
-    def _make_net_row(self, net, is_current):
-        sec = net['security'].upper()
-        col = sec_color(sec)
-        sig = net['signal']
-        sc  = sig_color(sig)
-
-        row = ctk.CTkFrame(self.results_frame, fg_color=C['sf'],
-                            border_color=C['ok'] if is_current else col,
-                            border_width=1, corner_radius=8)
-        row.pack(fill='x', pady=3)
-
-        left = ctk.CTkFrame(row, fg_color='transparent')
-        left.pack(side='left', padx=12, pady=8)
-
-        icon = '🔓' if sec == 'OPEN' else '⚠️' if 'WEP' in sec else '🔒'
-        ctk.CTkLabel(left, text=icon, font=('Courier', 20)).pack()
-
-        mid = ctk.CTkFrame(row, fg_color='transparent')
-        mid.pack(side='left', fill='both', expand=True, padx=4, pady=8)
-
-        ssid_row = ctk.CTkFrame(mid, fg_color='transparent')
-        ssid_row.pack(fill='x')
-        ctk.CTkLabel(ssid_row, text=net['ssid'],
-                     font=('Courier', 11, 'bold'),
-                     text_color=C['ok'] if is_current else C['tx']
-                     ).pack(side='left')
-        if is_current:
-            ctk.CTkLabel(ssid_row, text="  ✓ CONNECTED",
-                         font=('Courier', 8), text_color=C['ok']).pack(side='left')
-
-        ctk.CTkLabel(mid,
-                     text=f"{sec}  ·  CH {net['channel']}  ·  {net['freq']}  ·  BSSID: {net['bssid']}",
-                     font=('Courier', 8), text_color=C['mu']).pack(anchor='w')
-
-        if sec == 'OPEN':
-            ctk.CTkLabel(mid, text="⚠ No encryption — avoid sensitive activity",
-                         font=('Courier', 8), text_color=C['wn']).pack(anchor='w')
-        elif 'WEP' in sec:
-            ctk.CTkLabel(mid, text="⚠ WEP is broken — treat as open network",
-                         font=('Courier', 8), text_color=C['wn']).pack(anchor='w')
-
-        right = ctk.CTkFrame(row, fg_color='transparent')
-        right.pack(side='right', padx=12, pady=8)
-
-        # Security badge
-        badge = ctk.CTkFrame(right, fg_color=col,
-                              border_color=col, border_width=1, corner_radius=3)
-        badge.pack(pady=(0, 4))
-        ctk.CTkLabel(badge, text=sec[:8],
-                     font=('Courier', 7, 'bold'),
-                     text_color=col).pack(padx=6, pady=2)
-
-        # Signal bars
-        bar_frame = ctk.CTkFrame(right, fg_color='transparent')
-        bar_frame.pack()
-        bars = 4 if sig >= 75 else 3 if sig >= 50 else 2 if sig >= 25 else 1
-        for b in range(4):
-            h = (b + 1) * 5 + 3
-            c_col = sc if b < bars else C['br']
-            ctk.CTkFrame(bar_frame, width=5, height=h,
-                         fg_color=c_col, corner_radius=1
-                         ).pack(side='left', padx=1, anchor='s')
-
-        ctk.CTkLabel(right, text=f"{sig}%", font=('Courier', 8),
-                     text_color=sc).pack()
+            sec  = net['security'].upper()
+            col  = sec_color(sec)
+            sig  = net.get('signal',0)
+            sc   = sig_color(sig)
+            icon = '🔓' if sec=='OPEN' else '⚠️' if 'WEP' in sec else '🔒'
+            row  = ctk.CTkFrame(self.nearby_frame, fg_color=C['sf'],
+                                 border_color=C['ok'] if net['ssid']==curr.strip() else col,
+                                 border_width=1, corner_radius=8)
+            row.pack(fill='x', pady=3)
+            ctk.CTkLabel(row, text=icon, font=('Courier',18)).pack(side='left', padx=10, pady=8)
+            mid = ctk.CTkFrame(row, fg_color='transparent')
+            mid.pack(side='left', fill='both', expand=True, pady=8)
+            ctk.CTkLabel(mid, text=net['ssid']+('' if net['ssid']!=curr.strip() else '  ✓ CONNECTED'),
+                         font=('Courier',11,'bold'),
+                         text_color=C['ok'] if net['ssid']==curr.strip() else C['tx']
+                         ).pack(anchor='w')
+            ctk.CTkLabel(mid, text=f"{sec}  ·  CH {net['channel']}  ·  {net['freq']}  ·  BSSID: {net['bssid']}",
+                         font=('Courier',8), text_color=C['mu']).pack(anchor='w')
+            if sec=='OPEN':
+                ctk.CTkLabel(mid, text="⚠ No encryption", font=('Courier',8), text_color=C['wn']).pack(anchor='w')
+            right = ctk.CTkFrame(row, fg_color='transparent')
+            right.pack(side='right', padx=12, pady=8)
+            badge = ctk.CTkFrame(right, fg_color=C['s2'], border_color=col, border_width=1, corner_radius=3)
+            badge.pack(pady=(0,4))
+            ctk.CTkLabel(badge, text=sec[:8], font=('Courier',7,'bold'), text_color=col).pack(padx=6,pady=2)
+            bars = 4 if sig>=75 else 3 if sig>=50 else 2 if sig>=25 else 1
+            br = ctk.CTkFrame(right, fg_color='transparent')
+            br.pack()
+            for b in range(4):
+                ctk.CTkFrame(br, width=5, height=(b+1)*5+3,
+                             fg_color=sc if b<bars else C['br'],
+                             corner_radius=1).pack(side='left', padx=1, anchor='s')
+            ctk.CTkLabel(right, text=f"{sig}%", font=('Courier',8), text_color=sc).pack()

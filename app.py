@@ -148,10 +148,15 @@ class MintScanApp:
             ('🔔 NOTIFS',     'notifs'),
             ('🔍 PORT SCAN',  'ports'),
             ('📱 USB SYNC',   'usb'),
+            ('📦 APK INSTALL','apk'),
             ('🔬 NET SCAN',   'netscan'),
             ('🦠 MALWARE',    'malware'),
             ('🔧 SYS FIX',    'sysfix'),
+            ('⚙  SETTINGS',   'settings'),
         ]
+
+        # Filter tabs to only show available screens
+        TABS = [t for t in TABS if t[1] in screen_classes]
 
         self._tab_btns = {}
         for label, key in TABS:
@@ -174,36 +179,46 @@ class MintScanApp:
         self.content = ctk.CTkFrame(self.root, fg_color=C['bg'], corner_radius=0)
         self.content.pack(fill='both', expand=True, side='left')
 
-        # Import screens here to avoid circular imports
-        from dash     import DashScreen
-        from perms    import PermsScreen
-        from wifi     import WifiScreen
-        from calls    import CallsScreen
-        from network  import NetworkScreen
-        from battery  import BatteryScreen
-        from threats  import ThreatsScreen
-        from notifs   import NotifsScreen
-        from ports    import PortsScreen
-        from usb      import UsbScreen
-        from netscan  import NetScanScreen
-        from malware  import MalwareScreen
-        from sysfix   import SysFixScreen
+        # Import all screens with safe fallback
+        import importlib as _il
+        import sys as _sys
+        _base = os.path.dirname(os.path.abspath(__file__))
+        if _base not in _sys.path: _sys.path.insert(0, _base)
 
-        screen_classes = {
-            'dash':    DashScreen,
-            'perms':   PermsScreen,
-            'wifi':    WifiScreen,
-            'calls':   CallsScreen,
-            'network': NetworkScreen,
-            'battery': BatteryScreen,
-            'threats': ThreatsScreen,
-            'notifs':  NotifsScreen,
-            'ports':   PortsScreen,
-            'usb':     UsbScreen,
-            'netscan': NetScanScreen,
-            'malware': MalwareScreen,
-            'sysfix':  SysFixScreen,
-        }
+        from dash    import DashScreen
+        from perms   import PermsScreen
+        from wifi    import WifiScreen
+        from calls   import CallsScreen
+        from network import NetworkScreen
+        from battery import BatteryScreen
+        from threats import ThreatsScreen
+        from notifs  import NotifsScreen
+        from ports   import PortsScreen
+
+        def _si(mod, cls):
+            try: return getattr(_il.import_module(mod), cls)
+            except Exception as e:
+                print(f"  Note: {mod} unavailable ({e})")
+                return None
+
+        UsbScreen      = _si('usb',         'UsbScreen')
+        ApkScreen      = _si('apk_install', 'ApkScreen')
+        NetScanScreen  = _si('netscan',     'NetScanScreen')
+        MalwareScreen  = _si('malware',     'MalwareScreen')
+        SysFixScreen   = _si('sysfix',      'SysFixScreen')
+        SettingsScreen = _si('settings',    'SettingsScreen')
+
+        _all_screens = [
+            ('dash',    DashScreen),    ('perms',    PermsScreen),
+            ('wifi',    WifiScreen),    ('calls',    CallsScreen),
+            ('network', NetworkScreen), ('battery',  BatteryScreen),
+            ('threats', ThreatsScreen), ('notifs',   NotifsScreen),
+            ('ports',   PortsScreen),   ('usb',      UsbScreen),
+            ('apk',     ApkScreen),     ('netscan',  NetScanScreen),
+            ('malware', MalwareScreen), ('sysfix',   SysFixScreen),
+            ('settings',SettingsScreen),
+        ]
+        screen_classes = {k: v for k, v in _all_screens if v is not None}
 
         for key, cls in screen_classes.items():
             frame = cls(self.content, self)
