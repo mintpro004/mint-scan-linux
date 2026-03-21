@@ -12,13 +12,8 @@ import os
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
-C = {
-    'bg':  '#020c14', 'sf':  '#061523', 's2':  '#0a1e2e',
-    'br':  '#0d2a3d', 'br2': '#1a3a52', 'ac':  '#00ffe0',
-    'wn':  '#ff4c4c', 'am':  '#ffb830', 'ok':  '#39ff88',
-    'bl':  '#4d9fff', 'pu':  '#c084fc', 'tx':  '#c8e8f4',
-    'mu':  '#3a6278', 'mu2': '#5a8298',
-}
+# Import C from widgets — supports dark/light theme switching
+from widgets import C, apply_theme
 MONO    = ('Courier', 10)
 MONO_SM = ('Courier', 9)
 MONO_LG = ('Courier', 14)
@@ -193,6 +188,7 @@ class MintScanApp:
             ('MALWARE',     'malware'),
             ('SYS FIX',     'sysfix'),
             ('SETTINGS',    'settings'),
+            ('FIREWALL',    'firewall'),
             ('WIFI SYNC',   'wireless'),
         ]
         tabs = [(lbl, key) for lbl, key in ALL_TABS if key in screen_classes]
