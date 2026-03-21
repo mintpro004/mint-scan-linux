@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#020c14">
+<title>Mint Scan Companion</title>
+<style>
+  :root {
+    --bg:#020c14;--sf:#061523;--s2:#0a1e2e;
+    --br:#0d2a3d;--br2:#1a3a52;--ac:#00ffe0;
+    --wn:#ff4c4c;--am:#ffb830;--ok:#39ff88;
+    --bl:#4d9fff;--tx:#c8e8f4;--mu:#3a6278;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--tx);font-family:'Courier New',monospace;
+       font-size:14px;min-height:100vh;}
+
+  /* Header */
+  .header{background:var(--sf);padding:14px 16px;display:flex;
+          align-items:center;justify-content:space-between;
+          border-bottom:2px solid var(--ac);position:sticky;top:0;z-index:10;}
+  .header h1{color:var(--ac);font-size:18px;letter-spacing:2px;}
+  .header .sub{color:var(--mu);font-size:10px;}
+  .status-dot{width:10px;height:10px;border-radius:50%;background:var(--ok);
+              animation:pulse 1.5s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+  /* Tabs */
+  .tabs{display:flex;background:var(--sf);border-bottom:1px solid var(--br);
+        overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tab{padding:12px 16px;font-size:12px;color:var(--mu);cursor:pointer;
+       white-space:nowrap;border-bottom:2px solid transparent;transition:all 0.2s;}
+  .tab.active{color:var(--ac);border-bottom-color:var(--ac);}
+
+  /* Content */
+  .content{padding:14px;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  /* Cards */
+  .card{background:var(--sf);border:1px solid var(--br);border-radius:10px;
+        padding:14px;margin-bottom:12px;}
+  .card-title{color:var(--ac);font-size:11px;font-weight:bold;
+              letter-spacing:1px;margin-bottom:10px;opacity:0.8;}
+
+  /* Grid */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+  .grid-item{background:var(--s2);border:1px solid var(--br);
+             border-radius:8px;padding:10px;}
+  .grid-label{color:var(--mu);font-size:9px;margin-bottom:4px;
+              text-transform:uppercase;letter-spacing:1px;}
+  .grid-value{color:var(--tx);font-size:13px;font-weight:bold;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .grid-value.ok{color:var(--ok);}
+  .grid-value.warn{color:var(--wn);}
+  .grid-value.am{color:var(--am);}
+  .grid-value.ac{color:var(--ac);}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;
+       padding:10px 18px;border-radius:6px;font-size:12px;font-family:inherit;
+       font-weight:bold;cursor:pointer;border:1px solid;transition:all 0.15s;
+       letter-spacing:0.5px;-webkit-tap-highlight-color:transparent;}
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:transparent;border-color:var(--ac);color:var(--ac);}
+  .btn-danger{background:transparent;border-color:var(--wn);color:var(--wn);}
+  .btn-ok{background:transparent;border-color:var(--ok);color:var(--ok);}
+  .btn-ghost{background:transparent;border-color:var(--br2);color:var(--mu);}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .btn-full{width:100%;margin-top:8px;}
+
+  /* Result box */
+  .result{border:1px solid;border-radius:8px;padding:12px;margin-bottom:8px;}
+  .result.ok{border-color:var(--ok);background:rgba(57,255,136,0.05);}
+  .result.warn{border-color:var(--wn);background:rgba(255,76,76,0.05);}
+  .result.med{border-color:var(--am);background:rgba(255,184,48,0.05);}
+  .result.info{border-color:var(--bl);background:rgba(77,159,255,0.05);}
+  .result-title{font-weight:bold;font-size:12px;margin-bottom:4px;}
+  .result.ok .result-title{color:var(--ok);}
+  .result.warn .result-title{color:var(--wn);}
+  .result.med .result-title{color:var(--am);}
+  .result.info .result-title{color:var(--bl);}
+  .result-body{color:var(--mu);font-size:11px;line-height:1.5;}
+
+  /* Log */
+  .log{background:var(--s2);border:1px solid var(--br);border-radius:6px;
+       padding:10px;font-size:11px;color:var(--ok);max-height:180px;
+       overflow-y:auto;line-height:1.6;white-space:pre-wrap;word-break:break-all;}
+
+  /* Permission row */
+  .perm-row{display:flex;align-items:center;justify-content:space-between;
+            padding:10px 0;border-bottom:1px solid var(--br);}
+  .perm-row:last-child{border-bottom:none;}
+  .perm-name{color:var(--tx);font-size:12px;}
+  .perm-status{font-size:11px;font-weight:bold;}
+  .perm-status.granted{color:var(--ok);}
+  .perm-status.denied{color:var(--wn);}
+
+  /* Battery bar */
+  .bat-bar{height:12px;background:var(--br);border-radius:6px;overflow:hidden;margin:8px 0;}
+  .bat-fill{height:100%;border-radius:6px;transition:width 0.5s;}
+
+  /* Score circle */
+  .score-wrap{display:flex;flex-direction:column;align-items:center;padding:16px 0;}
+  .score-circle{width:100px;height:100px;border-radius:50%;
+                display:flex;flex-direction:column;align-items:center;
+                justify-content:center;border:3px solid;}
+  .score-num{font-size:28px;font-weight:bold;}
+  .score-lbl{font-size:9px;letter-spacing:2px;opacity:0.7;}
+  .score-wrap p{margin-top:8px;font-size:11px;color:var(--mu);}
+
+  /* Spinner */
+  .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--br2);
+           border-top-color:var(--ac);border-radius:50%;animation:spin 0.7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Section header */
+  .section-hdr{color:var(--mu);font-size:10px;letter-spacing:2px;
+               margin:14px 0 8px;border-bottom:1px solid var(--br);
+               padding-bottom:6px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>[ MINT SCAN ]</h1>
+    <div class="sub">MOBILE COMPANION  •  MINT PROJECTS</div>
+  </div>
+  <div class="status-dot" id="statusDot" title="Live"></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard')">⬡ DASHBOARD</div>
+  <div class="tab" onclick="showTab('device')">📱 DEVICE</div>
+  <div class="tab" onclick="showTab('battery')">🔋 BATTERY</div>
+  <div class="tab" onclick="showTab('security')">⚠ SECURITY</div>
+  <div class="tab" onclick="showTab('network')">📡 NETWORK</div>
+  <div class="tab" onclick="showTab('perms')">🔑 PERMS</div>
+</div>
+
+<div class="content">
+
+  <!-- DASHBOARD -->
+  <div id="screen-dashboard" class="screen active">
+    <div class="score-wrap">
+      <div class="score-circle" id="scoreCircle" style="border-color:var(--ok)">
+        <div class="score-num" id="scoreNum" style="color:var(--ok)">--</div>
+        <div class="score-lbl">SCORE</div>
+      </div>
+      <p id="scoreDesc">Tap SCAN to calculate your security score</p>
+    </div>
+
+    <div class="grid" id="dashGrid">
+      <div class="grid-item"><div class="grid-label">Device</div><div class="grid-value ac" id="dDevice">--</div></div>
+      <div class="grid-item"><div class="grid-label">Android</div><div class="grid-value" id="dAndroid">--</div></div>
+      <div class="grid-item"><div class="grid-label">Battery</div><div class="grid-value ok" id="dBattery">--</div></div>
+      <div class="grid-item"><div class="grid-label">Storage</div><div class="grid-value" id="dStorage">--</div></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary btn-full" onclick="runFullScan()">▶ RUN FULL SCAN</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="refreshAll()" style="flex:1">↺ REFRESH</button>
+      <button class="btn btn-ghost" onclick="showTab('security')" style="flex:1">⚠ THREATS</button>
+    </div>
+
+    <p class="section-hdr">QUICK STATUS</p>
+    <div id="quickStatus">
+      <div class="result info"><div class="result-title">ℹ Tap SCAN to check device</div>
+      <div class="result-body">Security score, threats, permissions and network will be analysed.</div></div>
+    </div>
+  </div>
+
+  <!-- DEVICE INFO -->
+  <div id="screen-device" class="screen">
+    <p class="section-hdr">DEVICE INFORMATION</p>
+    <div class="card">
+      <div class="grid">
+        <div class="grid-item"><div class="grid-label">Brand</div><div class="grid-value ac" id="devBrand">--</div></div>
+        <div class="grid-item"><div class="grid-label">Model</div><div class="grid-value" id="devModel">--</div></div>
+        <div class="grid-item"><div class="grid-label">Android</div><div class="grid-value" id="devAndroid">--</div></div>
+        <div class="grid-item"><div class="grid-label">API Level</div><div class="grid-value" id="devApi">--</div></div>
+        <div class="grid-item"><div class="grid-label">RAM</div><div class="grid-value" id="devRam">--</div></div>
+        <div class="grid-item"><div class="grid-label">Storage</div><div class="grid-value" id="devStorage">--</div></div>
+        <div class="grid-item"><div class="grid-label">Screen</div><div class="grid-value" id="devScreen">--</div></div>
+        <div class="grid-item"><div class="grid-label">Rooted</div><div class="grid-value" id="devRoot">--</div></div>
+      </div>
+    </div>
+    <p class="section-hdr">NETWORK</p>
+    <div class="card">
+      <div class="grid">
+        <div class="grid-item"><div class="grid-label">Wi-Fi SSID</div><div class="grid-value ac" id="netSSID">--</div></div>
+        <div class="grid-item"><div class="grid-label">IP Address</div><div class="grid-value" id="netIP">--</div></div>
+        <div class="grid-item"><div class="grid-label">Connection</div><div class="grid-value" id="netType">--</div></div>
+        <div class="grid-item"><div class="grid-label">Carrier</div><div class="grid-value" id="netCarrier">--</div></div>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-full" onclick="loadDeviceInfo()">↺ REFRESH</button>
+  </div>
+
+  <!-- BATTERY -->
+  <div id="screen-battery" class="screen">
+    <p class="section-hdr">BATTERY STATUS</p>
+    <div class="card">
+      <div style="text-align:center;padding:8px 0 16px">
+        <div style="font-size:48px;font-weight:bold;color:var(--ok)" id="batPct">--%</div>
+        <div style="color:var(--mu);font-size:11px" id="batStatus">Loading...</div>
+      </div>
+      <div class="bat-bar">
+        <div class="bat-fill" id="batBar" style="width:0%;background:var(--ok)"></div>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <div class="grid-item"><div class="grid-label">Health</div><div class="grid-value ok" id="batHealth">--</div></div>
+        <div class="grid-item"><div class="grid-label">Temperature</div><div class="grid-value" id="batTemp">--</div></div>
+        <div class="grid-item"><div class="grid-label">Voltage</div><div class="grid-value" id="batVolt">--</div></div>
+        <div class="grid-item"><div class="grid-label">Technology</div><div class="grid-value" id="batTech">--</div></div>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-full" onclick="loadBattery()">↺ REFRESH</button>
+  </div>
+
+  <!-- SECURITY -->
+  <div id="screen-security" class="screen">
+    <p class="section-hdr">SECURITY SCAN</p>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-danger" onclick="runSecurityScan()" style="flex:1">▶ SCAN NOW</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('secLog').textContent=''" style="flex:1">🗑 CLEAR</button>
+    </div>
+    <div id="secResults">
+      <div class="result info">
+        <div class="result-title">ℹ Ready to scan</div>
+        <div class="result-body">Tap SCAN NOW to check for security threats on this device.</div>
+      </div>
+    </div>
+    <p class="section-hdr">SCAN LOG</p>
+    <div class="log" id="secLog">Tap SCAN NOW to start...</div>
+  </div>
+
+  <!-- NETWORK -->
+  <div id="screen-network" class="screen">
+    <p class="section-hdr">NETWORK STATUS</p>
+    <div class="card">
+      <div class="grid">
+        <div class="grid-item"><div class="grid-label">Online</div><div class="grid-value ok" id="netOnline">--</div></div>
+        <div class="grid-item"><div class="grid-label">Type</div><div class="grid-value" id="netConnType">--</div></div>
+        <div class="grid-item"><div class="grid-label">Downlink</div><div class="grid-value" id="netDown">--</div></div>
+        <div class="grid-item"><div class="grid-label">RTT</div><div class="grid-value" id="netRTT">--</div></div>
+      </div>
+    </div>
+    <p class="section-hdr">LATENCY TEST</p>
+    <div class="card">
+      <button class="btn btn-primary btn-full" onclick="runPingTest()">▶ RUN PING TEST</button>
+      <div id="pingResult" style="margin-top:10px;color:var(--mu);font-size:11px">Tap above to test latency</div>
+    </div>
+  </div>
+
+  <!-- PERMISSIONS -->
+  <div id="screen-perms" class="screen">
+    <p class="section-hdr">BROWSER PERMISSIONS</p>
+    <div class="card" id="permsList">
+      <div style="color:var(--mu);font-size:11px">Checking permissions...</div>
+    </div>
+    <p class="section-hdr">ABOUT THIS COMPANION</p>
+    <div class="result info">
+      <div class="result-title">Mint Scan Mobile Companion</div>
+      <div class="result-body">
+        Version 1.0  •  Mint Projects, Pretoria<br><br>
+        This companion app runs directly from your phone browser.
+        No Play Store installation required.<br><br>
+        Pushed to your device via ADB from Mint Scan Linux.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<script>
+// ── Tab navigation ────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  event.target.classList.add('active');
+  // Load data for this tab
+  if (name === 'battery')    loadBattery();
+  if (name === 'device')     loadDeviceInfo();
+  if (name === 'network')    loadNetwork();
+  if (name === 'perms')      loadPerms();
+}
+
+// ── Device info ───────────────────────────────────────────────
+function loadDeviceInfo() {
+  const ua = navigator.userAgent;
+  const android = ua.match(/Android ([\d.]+)/);
+  const model   = ua.match(/;\s([^;)]+)\sBuild/);
+
+  setText('devAndroid', android ? android[1] : 'Android');
+  setText('devModel',   model   ? model[1]   : 'Unknown');
+  setText('devBrand',   model   ? model[1].split(' ')[0] : 'Android');
+  setText('devApi',     android ? (parseFloat(android[1]) >= 13 ? '33+' : '21+') : '--');
+  setText('devRoot',    'Not detectable', 'mu');
+  setText('devScreen',  `${screen.width}×${screen.height}`);
+
+  if (navigator.deviceMemory)
+    setText('devRam', navigator.deviceMemory + ' GB');
+  else
+    setText('devRam', 'Unknown');
+
+  if (navigator.storage) {
+    navigator.storage.estimate().then(e => {
+      const used  = (e.usage  / 1024 / 1024).toFixed(0);
+      const total = (e.quota  / 1024 / 1024 / 1024).toFixed(1);
+      setText('devStorage', `${used} MB used / ${total} GB`);
+    });
+  }
+
+  loadNetwork();
+  setText('dDevice', model ? model[1] : 'Android', 'ac');
+  setText('dAndroid', android ? android[1] : '--');
+}
+
+// ── Battery ───────────────────────────────────────────────────
+function loadBattery() {
+  if (!navigator.getBattery) {
+    setText('batStatus', 'Battery API not available in this browser');
+    return;
+  }
+  navigator.getBattery().then(bat => {
+    const pct = Math.round(bat.level * 100);
+    const charging = bat.charging;
+
+    document.getElementById('batPct').textContent = pct + '%';
+    const col = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--am)' : 'var(--wn)';
+    document.getElementById('batPct').style.color = col;
+    document.getElementById('batBar').style.width = pct + '%';
+    document.getElementById('batBar').style.background = col;
+    setText('batStatus', charging ? '⚡ Charging' : '🔋 Discharging');
+    setText('batHealth', 'Good', 'ok');
+    setText('batTemp', '--');
+    setText('batVolt', '--');
+    setText('batTech', 'Li-Ion');
+    setText('dBattery', pct + '%', pct > 50 ? 'ok' : pct > 20 ? 'am' : 'warn');
+
+    bat.addEventListener('levelchange', loadBattery);
+    bat.addEventListener('chargingchange', loadBattery);
+  });
+}
+
+// ── Network ───────────────────────────────────────────────────
+function loadNetwork() {
+  const online = navigator.onLine;
+  setText('netOnline',   online ? '✓ Yes' : '✗ No', online ? 'ok' : 'warn');
+  setText('netOnline',   online ? '✓ Yes' : '✗ No', online ? 'ok' : 'warn');
+  setText('dStorage', '--');
+
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (conn) {
+    setText('netConnType', conn.effectiveType || conn.type || '--');
+    setText('netDown',     conn.downlink ? conn.downlink + ' Mbps' : '--');
+    setText('netRTT',      conn.rtt ? conn.rtt + ' ms' : '--');
+    setText('netType',     conn.effectiveType || '--');
+  } else {
+    setText('netConnType', online ? 'Connected' : 'Offline');
+    setText('netDown', '--');
+    setText('netRTT', '--');
+  }
+}
+
+async function runPingTest() {
+  const el = document.getElementById('pingResult');
+  el.textContent = '⟳ Testing...';
+  const times = [];
+  for (let i = 0; i < 5; i++) {
+    try {
+      const t0 = performance.now();
+      await fetch('https://www.google.com/generate_204?t=' + Date.now(),
+                  {mode:'no-cors', cache:'no-store'});
+      times.push(Math.round(performance.now() - t0));
+    } catch(e) {
+      times.push(999);
+    }
+  }
+  const avg = Math.round(times.reduce((a,b)=>a+b,0)/times.length);
+  const min = Math.min(...times);
+  const col = avg < 50 ? 'var(--ok)' : avg < 150 ? 'var(--am)' : 'var(--wn)';
+  el.innerHTML = `<span style="color:${col}">Avg: ${avg}ms  Min: ${min}ms</span>  (${times.join(', ')} ms)`;
+}
+
+// ── Security scan ─────────────────────────────────────────────
+function secLog(msg) {
+  const el = document.getElementById('secLog');
+  const ts = new Date().toTimeString().slice(0,8);
+  el.textContent += `[${ts}] ${msg}\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function addResult(container, type, title, body) {
+  const d = document.createElement('div');
+  d.className = 'result ' + type;
+  d.innerHTML = `<div class="result-title">${title}</div>
+                 <div class="result-body">${body}</div>`;
+  container.appendChild(d);
+}
+
+function runSecurityScan() {
+  const res = document.getElementById('secResults');
+  res.innerHTML = '';
+  secLog('Starting security scan...');
+
+  let score = 100;
+  let high = 0;
+
+  // Check HTTPS
+  secLog('Checking connection security...');
+  if (location.protocol === 'file:') {
+    secLog('  ✓ Loaded from local file (safe)');
+  } else if (location.protocol === 'https:') {
+    secLog('  ✓ HTTPS connection');
+  } else {
+    secLog('  ⚠ HTTP — unencrypted connection');
+    score -= 20; high++;
+    addResult(res,'warn','⚠ Unencrypted Connection',
+      'Page loaded over HTTP. Use HTTPS for secure communication.');
+  }
+
+  // Check online/offline
+  secLog('Checking network state...');
+  if (!navigator.onLine) {
+    secLog('  ℹ Device is offline');
+    addResult(res,'info','ℹ Device Offline',
+      'No active network connection detected.');
+  } else {
+    secLog('  ✓ Network connected');
+  }
+
+  // Check storage quota (overuse may indicate malware)
+  secLog('Checking storage usage...');
+  if (navigator.storage) {
+    navigator.storage.estimate().then(e => {
+      const usedMB = (e.usage||0) / 1024 / 1024;
+      if (usedMB > 500) {
+        secLog(`  ⚠ High browser storage: ${usedMB.toFixed(0)} MB`);
+        addResult(res,'med','⚠ High Storage Usage',
+          `${usedMB.toFixed(0)} MB used in browser storage. Clear cache if unexpected.`);
+      } else {
+        secLog(`  ✓ Storage OK: ${usedMB.toFixed(1)} MB`);
+      }
+    });
+  }
+
+  // Check battery (low + no charging = risk of data loss)
+  secLog('Checking battery...');
+  if (navigator.getBattery) {
+    navigator.getBattery().then(bat => {
+      const pct = Math.round(bat.level * 100);
+      if (pct < 15 && !bat.charging) {
+        score -= 10;
+        addResult(res,'warn','⚠ Critical Battery Level',
+          `Battery at ${pct}%. Plug in to prevent data loss during security operations.`);
+        secLog(`  ⚠ Battery critical: ${pct}%`);
+      } else {
+        secLog(`  ✓ Battery: ${pct}%`);
+      }
+    });
+  }
+
+  // Check cookies enabled
+  secLog('Checking browser security settings...');
+  if (navigator.cookieEnabled) {
+    secLog('  ✓ Cookies enabled (normal)');
+  }
+
+  // User agent analysis
+  const ua = navigator.userAgent;
+  if (ua.toLowerCase().includes('rooted') || ua.toLowerCase().includes('supersu')) {
+    score -= 30; high++;
+    addResult(res,'warn','⚠ Rooted Device Detected',
+      'Device may be rooted. Rooted devices have reduced security boundaries.');
+    secLog('  ⚠ Rooted device indicators found');
+  } else {
+    secLog('  ✓ No root indicators in UA');
+  }
+
+  // Finalize score
+  score = Math.max(0, score);
+  secLog(`\n✓ Scan complete — Score: ${score}/100`);
+
+  if (!res.children.length) {
+    addResult(res, 'ok', '✓ No Threats Detected',
+      'All security checks passed on this device.');
+  }
+
+  // Update dashboard score
+  updateScore(score);
+}
+
+function runFullScan() {
+  showTab('security');
+  setTimeout(runSecurityScan, 200);
+}
+
+// ── Score ─────────────────────────────────────────────────────
+function updateScore(score) {
+  const col = score >= 75 ? 'var(--ok)' : score >= 50 ? 'var(--am)' : 'var(--wn)';
+  const circle = document.getElementById('scoreCircle');
+  const num    = document.getElementById('scoreNum');
+  const desc   = document.getElementById('scoreDesc');
+  circle.style.borderColor = col;
+  num.style.color = col;
+  num.textContent = score;
+  desc.textContent = score >= 75 ? 'Your device looks secure' :
+                     score >= 50 ? 'Some issues found — review threats' :
+                     'High risk — action required';
+}
+
+// ── Permissions ───────────────────────────────────────────────
+async function loadPerms() {
+  const el = document.getElementById('permsList');
+  el.innerHTML = '';
+  const perms = [
+    {name:'Camera',    query:{name:'camera'}},
+    {name:'Microphone',query:{name:'microphone'}},
+    {name:'Location',  query:{name:'geolocation'}},
+    {name:'Notifications',query:{name:'notifications'}},
+    {name:'Clipboard', query:{name:'clipboard-read'}},
+  ];
+  for (const p of perms) {
+    try {
+      const status = await navigator.permissions.query(p.query);
+      const row = document.createElement('div');
+      row.className = 'perm-row';
+      const granted = status.state === 'granted';
+      const denied  = status.state === 'denied';
+      row.innerHTML = `<span class="perm-name">${p.name}</span>
+        <span class="perm-status ${granted?'granted':denied?'denied':''}">${status.state.toUpperCase()}</span>`;
+      el.appendChild(row);
+    } catch(e) {
+      const row = document.createElement('div');
+      row.className = 'perm-row';
+      row.innerHTML = `<span class="perm-name">${p.name}</span>
+        <span class="perm-status" style="color:var(--mu)">N/A</span>`;
+      el.appendChild(row);
+    }
+  }
+}
+
+// ── Utility ───────────────────────────────────────────────────
+function setText(id, text, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  if (cls) {
+    el.className = 'grid-value ' + cls;
+  }
+}
+
+function refreshAll() {
+  loadDeviceInfo();
+  loadBattery();
+  loadNetwork();
+}
+
+// ── Init ──────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  loadDeviceInfo();
+  loadBattery();
+  loadNetwork();
+});
+
+window.addEventListener('online',  () => setText('netOnline', '✓ Yes', 'ok'));
+window.addEventListener('offline', () => setText('netOnline', '✗ No', 'warn'));
+</script>
+</body>
+</html>

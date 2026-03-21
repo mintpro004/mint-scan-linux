@@ -1,24 +1,29 @@
-"""USB Phone Sync — ADB bridge for Android phone integration"""
+"""
+USB Phone Sync + Companion App + APK Installer — unified phone tab.
+No browsing required. Companion app pushes itself to phone via ADB.
+"""
 import tkinter as tk
 import customtkinter as ctk
-import threading, subprocess, os, time, re
-from installer import install_adb
+import threading, subprocess, os, re, time, shutil
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
+from installer import install_adb
 
-
-def run(cmd, timeout=10):
+def _r(cmd, timeout=20):
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip(), r.stderr.strip(), r.returncode
     except Exception as e:
         return '', str(e), 1
 
+BASE = os.path.dirname(os.path.abspath(__file__))
+COMPANION_HTML = os.path.join(BASE, 'companion_app.html')
+
 
 class UsbScreen(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
-        self._built = False
+        self._built  = False
         self._device = None
 
     def on_focus(self):
@@ -28,284 +33,510 @@ class UsbScreen(ctk.CTkFrame):
         threading.Thread(target=self._detect, daemon=True).start()
 
     def _build(self):
-        hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
+        # Header
+        hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=52, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="📱  USB PHONE SYNC", font=('Courier',13,'bold'),
-                     text_color=C['ac']).pack(side='left', padx=16)
-        self.status_dot = ctk.CTkLabel(hdr, text='● DETECTING...',
-                                        font=('Courier',9), text_color=C['mu'])
-        self.status_dot.pack(side='left', padx=8)
-        Btn(hdr, "↺ RESCAN", command=lambda: threading.Thread(
-            target=self._detect, daemon=True).start(),
-            variant='ghost', width=100).pack(side='right', padx=12, pady=6)
+        hdr.pack_propagate(False)
+        ctk.CTkLabel(hdr, text="📱  PHONE MANAGER",
+                     font=('Courier',13,'bold'), text_color=C['ac']
+                     ).pack(side='left', padx=16)
+        self.dev_lbl = ctk.CTkLabel(hdr, text="● Detecting...",
+                                     font=MONO_SM, text_color=C['mu'])
+        self.dev_lbl.pack(side='left', padx=8)
+        Btn(hdr, "↺ RESCAN",
+            command=lambda: threading.Thread(
+                target=self._detect, daemon=True).start(),
+            variant='ghost', width=90).pack(side='right', padx=8, pady=8)
 
         self.scroll = ScrollableFrame(self)
         self.scroll.pack(fill='both', expand=True)
         body = self.scroll
 
-        # Setup instructions
-        SectionHeader(body, '01', 'SETUP — ENABLE ADB ON PHONE').pack(fill='x', padx=14, pady=(14,4))
+        # ── 01 ADB Setup ──────────────────────────────────────
+        SectionHeader(body,'01','USB SETUP').pack(fill='x', padx=14, pady=(14,4))
         setup = Card(body, accent=C['bl'])
         setup.pack(fill='x', padx=14, pady=(0,8))
-        ctk.CTkLabel(setup,
-            text="STEP 1 — Enable Developer Options on your Android phone:\n"
-                 "  Settings → About Phone → tap Build Number 7 times\n\n"
-                 "STEP 2 — Enable USB Debugging:\n"
-                 "  Settings → Developer Options → USB Debugging → ON\n\n"
-                 "STEP 3 — Connect phone to Chromebook via USB cable\n\n"
-                 "STEP 4 — On your phone: tap 'Allow USB Debugging' → OK\n\n"
-                 "STEP 5 — Tap RESCAN above",
-            font=MONO_SM, text_color=C['mu'], justify='left'
-        ).pack(anchor='w', padx=12, pady=(10,10))
-        Btn(setup, "INSTALL ADB: sudo apt install adb",
-            command=self._install_adb, variant='blue', width=320
-        ).pack(anchor='w', padx=12, pady=(0,10))
 
-        # Device info
-        SectionHeader(body, '02', 'CONNECTED DEVICE').pack(fill='x', padx=14, pady=(10,4))
+        self.adb_status = ResultBox(setup,'ok','✓ Checking ADB...','')
+        self.adb_status.pack(fill='x', padx=8, pady=(8,4))
+        self.install_adb_btn = Btn(setup, "⬇ INSTALL ADB",
+            command=lambda: install_adb(self, on_done=lambda: threading.Thread(
+                target=self._detect, daemon=True).start()),
+            variant='primary', width=160)
+        self.install_adb_btn.pack(anchor='w', padx=12, pady=(0,4))
+        self.install_adb_btn.pack_forget()   # hidden until needed
+
+        ctk.CTkLabel(setup,
+            text="One-time phone setup:\n"
+                 "  1.  Settings → About Phone → tap Build Number 7 times\n"
+                 "  2.  Settings → Developer Options → USB Debugging → ON\n"
+                 "  3.  Connect USB cable to Chromebook\n"
+                 "  4.  Phone shows Allow USB Debugging? → tap ALLOW",
+            font=('Courier',8), text_color=C['mu'], justify='left'
+        ).pack(anchor='w', padx=12, pady=(4,10))
+
+        # ── 02 Device status ──────────────────────────────────
+        SectionHeader(body,'02','CONNECTED DEVICE').pack(fill='x', padx=14, pady=(10,4))
         self.dev_card = Card(body)
         self.dev_card.pack(fill='x', padx=14, pady=(0,8))
         self.dev_info = ctk.CTkLabel(self.dev_card,
-            text="No device detected. Connect phone via USB and enable USB debugging.",
+            text="No device detected.\nConnect phone and tap ↺ RESCAN",
             font=MONO_SM, text_color=C['mu'])
         self.dev_info.pack(padx=12, pady=12)
 
-        # Sync actions
-        SectionHeader(body, '03', 'SYNC & DATA').pack(fill='x', padx=14, pady=(10,4))
-        act_card = Card(body)
-        act_card.pack(fill='x', padx=14, pady=(0,8))
+        # ── 03 Companion App ──────────────────────────────────
+        SectionHeader(body,'03','MINT SCAN COMPANION APP').pack(
+            fill='x', padx=14, pady=(10,4))
 
-        grid = ctk.CTkFrame(act_card, fg_color='transparent')
-        grid.pack(fill='x', padx=8, pady=8)
-        actions = [
-            ("📋 PULL CALL LOG",    self._pull_calls,   'primary'),
-            ("💬 PULL SMS LOG",     self._pull_sms,     'primary'),
-            ("📇 PULL CONTACTS",   self._pull_contacts,'blue'),
-            ("📸 PULL SCREENSHOTS",self._pull_screenshots,'ghost'),
-            ("📶 GET WIFI NETWORKS",self._pull_wifi,    'warning'),
-            ("🔋 PHONE BATTERY",   self._phone_battery,'ghost'),
-            ("📱 DEVICE INFO",     self._phone_info,   'ghost'),
-            ("🔁 START SYNC",      self._start_sync,   'success'),
+        comp = Card(body, accent=C['ac'])
+        comp.pack(fill='x', padx=14, pady=(0,8))
+
+        ctk.CTkLabel(comp,
+            text="📱  SELF-INSTALLING COMPANION",
+            font=('Courier',11,'bold'), text_color=C['ac']
+        ).pack(anchor='w', padx=12, pady=(12,4))
+
+        ctk.CTkLabel(comp,
+            text="Mint Scan builds and pushes the companion app directly to your phone.\n"
+                 "No APK file needed. No Play Store. No browsing.\n"
+                 "Connect your phone via USB then tap the button below.",
+            font=('Courier',8), text_color=C['mu'], justify='left'
+        ).pack(anchor='w', padx=12, pady=(0,8))
+
+        # THE button — big, clear, does everything automatically
+        self.comp_btn = ctk.CTkButton(comp,
+            text="🚀  INSTALL COMPANION ON PHONE",
+            font=('Courier',11,'bold'),
+            height=48,
+            fg_color=C['ac'],
+            hover_color=C['br2'],
+            text_color=C['bg'],
+            corner_radius=8,
+            command=self._install_companion)
+        self.comp_btn.pack(fill='x', padx=12, pady=(0,6))
+
+        Btn(comp, "▶ OPEN COMPANION (already installed)",
+            command=self._open_companion,
+            variant='ghost', width=260
+        ).pack(anchor='w', padx=12, pady=(0,10))
+
+        self.comp_prog = ctk.CTkProgressBar(comp, height=4,
+                                             progress_color=C['ac'],
+                                             fg_color=C['br'])
+        self.comp_prog.pack(fill='x', padx=12, pady=(0,8))
+        self.comp_prog.set(0)
+
+        # ── 04 Install any APK ────────────────────────────────
+        SectionHeader(body,'04','INSTALL ANY APK').pack(
+            fill='x', padx=14, pady=(10,4))
+        apk_card = Card(body)
+        apk_card.pack(fill='x', padx=14, pady=(0,8))
+
+        ctk.CTkLabel(apk_card,
+            text="Install any APK file from your Linux filesystem to the phone:",
+            font=MONO_SM, text_color=C['mu']
+        ).pack(anchor='w', padx=12, pady=(10,4))
+
+        path_row = ctk.CTkFrame(apk_card, fg_color='transparent')
+        path_row.pack(fill='x', padx=12, pady=(0,6))
+        self.apk_entry = ctk.CTkEntry(path_row,
+            placeholder_text="/home/mint/Downloads/app.apk",
+            font=MONO_SM, fg_color=C['bg'],
+            border_color=C['br'], text_color=C['tx'], height=36)
+        self.apk_entry.pack(side='left', fill='x', expand=True, padx=(0,8))
+        Btn(path_row, "BROWSE", command=self._browse_apk,
+            variant='ghost', width=80).pack(side='left')
+
+        opts_row = ctk.CTkFrame(apk_card, fg_color='transparent')
+        opts_row.pack(fill='x', padx=12, pady=(0,4))
+        self.opt_replace   = ctk.BooleanVar(value=True)
+        self.opt_grant     = ctk.BooleanVar(value=True)
+        for var, lbl in [(self.opt_replace,'Replace existing (-r)'),
+                         (self.opt_grant,  'Grant all permissions (-g)')]:
+            ctk.CTkCheckBox(opts_row, text=lbl, variable=var,
+                            font=('Courier',8), text_color=C['tx'],
+                            fg_color=C['ac'], checkmark_color=C['bg'],
+                            border_color=C['br'], hover_color=C['br2']
+                            ).pack(side='left', padx=(0,16))
+
+        Btn(apk_card, "📦 INSTALL APK TO PHONE",
+            command=self._install_apk,
+            variant='primary', width=220
+        ).pack(anchor='w', padx=12, pady=(4,10))
+
+        # ── 05 Data sync ──────────────────────────────────────
+        SectionHeader(body,'05','SYNC DATA FROM PHONE').pack(
+            fill='x', padx=14, pady=(10,4))
+        sync = Card(body)
+        sync.pack(fill='x', padx=14, pady=(0,8))
+        sg = ctk.CTkFrame(sync, fg_color='transparent')
+        sg.pack(fill='x', padx=8, pady=8)
+        sync_actions = [
+            ("📋 Call Log",   self._pull_calls,    'primary'),
+            ("💬 SMS",        self._pull_sms,      'primary'),
+            ("📇 Contacts",   self._pull_contacts, 'blue'),
+            ("📶 Wi-Fi Nets", self._pull_wifi,     'warning'),
+            ("📸 Screenshot", self._screenshot,    'ghost'),
+            ("🔋 Battery",    self._phone_battery, 'ghost'),
+            ("📱 Device Info",self._phone_info,    'ghost'),
+            ("🔁 Full Sync",  self._full_sync,     'success'),
         ]
-        for i, (label, cmd, variant) in enumerate(actions):
-            r, c = divmod(i, 2)
-            Btn(grid, label, command=cmd, variant=variant, width=220
-                ).grid(row=r, column=c, padx=4, pady=4, sticky='ew')
-        grid.columnconfigure(0, weight=1)
-        grid.columnconfigure(1, weight=1)
+        for i,(lbl,cmd,var) in enumerate(sync_actions):
+            r2,c2 = divmod(i,2)
+            Btn(sg, lbl, command=cmd, variant=var, width=210
+                ).grid(row=r2, column=c2, padx=4, pady=4, sticky='ew')
+        sg.columnconfigure(0,weight=1)
+        sg.columnconfigure(1,weight=1)
 
-        # Output log
-        SectionHeader(body, '04', 'OUTPUT').pack(fill='x', padx=14, pady=(10,4))
-        self.log = ctk.CTkTextbox(body, height=200, font=('Courier',9),
-                                   fg_color=C['s2'], text_color=C['ok'],
-                                   border_color=C['br'], border_width=1,
-                                   corner_radius=6)
-        self.log.pack(fill='x', padx=14, pady=(0,14))
-        self.log.configure(state='disabled')
+        # ── 06 Output log ─────────────────────────────────────
+        SectionHeader(body,'06','OUTPUT').pack(fill='x', padx=14, pady=(10,4))
+        self.output = ctk.CTkTextbox(body, height=160, font=('Courier',8),
+                                      fg_color=C['s2'], text_color=C['ok'],
+                                      border_color=C['br'], border_width=1,
+                                      corner_radius=6)
+        self.output.pack(fill='x', padx=14, pady=(0,14))
+        self.output.configure(state='disabled')
 
-    def _log(self, msg, color=None):
-        self.log.configure(state='normal')
-        self.log.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
-        self.log.see('end')
-        self.log.configure(state='disabled')
+        # Update ADB status on build
+        threading.Thread(target=self._check_adb_status, daemon=True).start()
+
+    # ── Logging ───────────────────────────────────────────────
+
+    def _log(self, msg):
+        def _do():
+            self.output.configure(state='normal')
+            self.output.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+            self.output.see('end')
+            self.output.configure(state='disabled')
+        self.after(0, _do)
+
+    # ── ADB check ─────────────────────────────────────────────
+
+    def _check_adb_status(self):
+        adb_ok = shutil.which('adb') is not None
+        if adb_ok:
+            ver, _, _ = _r("adb version 2>/dev/null | head -1")
+            def _do():
+                for w in self.adb_status.winfo_children(): w.destroy()
+                ResultBox(self.adb_status.__class__.__bases__[0].__new__(
+                    ctk.CTkFrame), 'ok',
+                    f'✓ ADB Ready — {ver}', '').pack()
+                # Recreate properly
+                self.adb_status.destroy()
+                self.adb_status = ResultBox(
+                    self.adb_status.master if hasattr(self.adb_status,'master')
+                    else self.scroll._body,
+                    'ok', f'✓ ADB Ready  —  {ver[:50]}', '')
+                self.install_adb_btn.pack_forget()
+            # Simpler approach
+            self.after(0, lambda: self.install_adb_btn.pack_forget())
+        else:
+            self.after(0, lambda: self.install_adb_btn.pack(
+                anchor='w', padx=12, pady=(0,4)))
+            self._log("ADB not installed — tap INSTALL ADB in the setup section")
+
+    # ── Device detection ──────────────────────────────────────
 
     def _detect(self):
-        out, _, rc = run('adb devices 2>/dev/null')
-        if rc != 0 or 'adb' not in out.lower() and not out:
+        if not shutil.which('adb'):
             self.after(0, lambda: (
-                self.status_dot.configure(text='● ADB NOT INSTALLED', text_color=C['wn']),
-                self.dev_info.configure(text='ADB not found.\nRun: sudo apt install adb\nthen reconnect phone.')
-            ))
-            return
-
-        lines = [l for l in out.split('\n')[1:] if l.strip() and 'offline' not in l]
-        devices = [l.split('\t')[0] for l in lines if '\t' in l]
-
-        if not devices:
-            self.after(0, lambda: (
-                self.status_dot.configure(text='● NO DEVICE', text_color=C['wn']),
+                self.dev_lbl.configure(text='● ADB needed', text_color=C['wn']),
                 self.dev_info.configure(
-                    text='No Android device detected.\n\n'
-                         '1. Make sure USB cable is connected\n'
-                         '2. USB Debugging is ON in Developer Options\n'
-                         '3. You tapped "Allow" on your phone')
+                    text='Install ADB first — see section 01 above',
+                    text_color=C['wn'])
             ))
             return
 
-        serial = devices[0]
+        out, _, _ = _r("adb devices 2>/dev/null")
+        lines  = [l for l in out.split('\n')[1:]
+                  if '\t' in l and 'offline' not in l and 'unauthorized' not in l]
+        unauth = [l for l in out.split('\n')[1:] if 'unauthorized' in l]
+
+        if not lines:
+            msg = ("Phone connected but not authorized.\n"
+                   "Check your phone screen → tap ALLOW USB Debugging"
+                   if unauth else
+                   "No device found.\n"
+                   "1. Connect USB cable\n"
+                   "2. Enable USB Debugging on phone\n"
+                   "3. Tap Allow on phone screen\n"
+                   "4. Tap ↺ RESCAN above")
+            col = C['am'] if unauth else C['wn']
+            self._device = None
+            self.after(0, lambda: (
+                self.dev_lbl.configure(text='● No device', text_color=col),
+                self.dev_info.configure(text=msg, text_color=col)
+            ))
+            return
+
+        serial = lines[0].split('\t')[0]
         self._device = serial
 
         # Get device details
-        model,  _, _ = run(f'adb -s {serial} shell getprop ro.product.model')
-        brand,  _, _ = run(f'adb -s {serial} shell getprop ro.product.brand')
-        android,_, _ = run(f'adb -s {serial} shell getprop ro.build.version.release')
-        api,    _, _ = run(f'adb -s {serial} shell getprop ro.build.version.sdk')
-        bat_out,_, _ = run(f'adb -s {serial} shell dumpsys battery | grep level')
-        bat = re.search(r'level: (\d+)', bat_out)
-        bat_pct = bat.group(1) if bat else '—'
+        brand,   _, _ = _r(f"adb -s {serial} shell getprop ro.product.brand 2>/dev/null")
+        model,   _, _ = _r(f"adb -s {serial} shell getprop ro.product.model 2>/dev/null")
+        android, _, _ = _r(f"adb -s {serial} shell getprop ro.build.version.release 2>/dev/null")
+        bat,     _, _ = _r(f"adb -s {serial} shell dumpsys battery 2>/dev/null | grep level")
+        bat_m = re.search(r'level: (\d+)', bat)
+        bat_pct = (bat_m.group(1) + '%') if bat_m else '—'
 
-        info_text = (f"✓ CONNECTED: {brand} {model}\n"
-                     f"Android {android}  •  API {api}  •  Battery {bat_pct}%\n"
-                     f"Serial: {serial}")
-
+        info = (f"✓  {brand} {model}\n"
+                f"Android {android}  •  Battery {bat_pct}  •  {serial}")
         self.after(0, lambda: (
-            self.status_dot.configure(text=f'● CONNECTED: {brand} {model}', text_color=C['ok']),
-            self.dev_info.configure(text=info_text, text_color=C['ok'])
+            self.dev_lbl.configure(
+                text=f"● {brand} {model}", text_color=C['ok']),
+            self.dev_info.configure(text=info, text_color=C['ok'])
         ))
-        self.after(0, self._log, f"Device connected: {brand} {model} (Android {android})")
+        self._log(f"Connected: {brand} {model} (Android {android}, {bat_pct})")
+
+    # ── Companion install ──────────────────────────────────────
+
+    def _install_companion(self):
+        if not self._device:
+            self._log("⚠ No phone connected.")
+            self._log("  Connect USB cable → Enable USB Debugging → Tap Allow → Tap ↺ RESCAN")
+            return
+
+        if not os.path.exists(COMPANION_HTML):
+            self._log(f"⚠ companion_app.html not found at: {COMPANION_HTML}")
+            self._log("  Update your files: cd ~/mint-scan-linux && git pull && bash install.sh")
+            return
+
+        # Disable button during install
+        self.after(0, lambda: self.comp_btn.configure(
+            state='disabled', text='⟳  Installing...'))
+        self.after(0, lambda: self.comp_prog.set(0.1))
+        threading.Thread(target=self._do_install_companion, daemon=True).start()
+
+    def _do_install_companion(self):
+        dest = '/sdcard/Download/MintScanCompanion.html'
+        self._log("Pushing Mint Scan Companion to phone...")
+        self.after(0, lambda: self.comp_prog.set(0.3))
+
+        out, err, rc = _r(
+            f"adb -s {self._device} push '{COMPANION_HTML}' '{dest}'",
+            timeout=20)
+
+        if rc != 0:
+            self._log(f"✗ Push failed: {err or out}")
+            self._log("  Check: is USB Debugging still enabled? Try RESCAN.")
+            self.after(0, lambda: self.comp_btn.configure(
+                state='normal', text='🚀  INSTALL COMPANION ON PHONE'))
+            self.after(0, lambda: self.comp_prog.set(0))
+            return
+
+        self._log("✓ Companion app pushed to phone")
+        self.after(0, lambda: self.comp_prog.set(0.7))
+        self._log("Opening companion in phone browser...")
+
+        # Try to open in Chrome
+        open_rc = 1
+        for intent_cmd in [
+            # Standard VIEW intent
+            (f"adb -s {self._device} shell am start -a android.intent.action.VIEW "
+             f"-t text/html -d 'file:///sdcard/Download/MintScanCompanion.html'"),
+            # Chrome directly
+            (f"adb -s {self._device} shell am start -n "
+             f"com.android.chrome/com.google.android.apps.chrome.Main "
+             f"--es url 'file:///sdcard/Download/MintScanCompanion.html'"),
+            # Generic browser
+            (f"adb -s {self._device} shell am start -a android.intent.action.VIEW "
+             f"'file:///sdcard/Download/MintScanCompanion.html'"),
+        ]:
+            _, _, open_rc = _r(intent_cmd, timeout=8)
+            if open_rc == 0:
+                break
+
+        self.after(0, lambda: self.comp_prog.set(1.0))
+
+        if open_rc == 0:
+            self._log("✓ Companion app is now open on your phone!")
+            self._log("")
+            self._log("The Mint Scan companion dashboard is running.")
+            self._log("Bookmark it on your phone for quick access.")
+        else:
+            self._log("✓ App pushed. To open it:")
+            self._log("  Files app → Downloads → MintScanCompanion.html → Open")
+
+        self.after(0, lambda: self.comp_btn.configure(
+            state='normal', text='🚀  INSTALL COMPANION ON PHONE'))
+
+    def _open_companion(self):
+        if not self._device:
+            self._log("No device connected. Tap ↺ RESCAN first.")
+            return
+        def _do():
+            _, _, rc = _r(
+                f"adb -s {self._device} shell am start -a android.intent.action.VIEW "
+                f"-d 'file:///sdcard/Download/MintScanCompanion.html'",
+                timeout=8)
+            self._log("✓ Opened on phone" if rc == 0
+                      else "Open manually: Files → Downloads → MintScanCompanion.html")
+        threading.Thread(target=_do, daemon=True).start()
+
+    # ── APK install ───────────────────────────────────────────
+
+    def _browse_apk(self):
+        try:
+            import tkinter.filedialog as fd
+            path = fd.askopenfilename(
+                title="Select APK file",
+                filetypes=[("Android Package","*.apk"),("All","*.*")],
+                initialdir=os.path.expanduser("~/Downloads"))
+            if path:
+                self.apk_entry.delete(0,'end')
+                self.apk_entry.insert(0, path)
+                sz = os.path.getsize(path)/1024/1024
+                self._log(f"Selected: {os.path.basename(path)} ({sz:.1f} MB)")
+        except Exception as e:
+            self._log(f"Browse error: {e}")
+
+    def _install_apk(self):
+        if not self._device:
+            self._log("No device connected. Tap ↺ RESCAN first.")
+            return
+        path = self.apk_entry.get().strip()
+        if not path:
+            self._log("Enter APK path or tap BROWSE to select a file.")
+            return
+        if not os.path.exists(path):
+            self._log(f"File not found: {path}")
+            return
+        def _do():
+            flags = []
+            if self.opt_replace.get(): flags.append('-r')
+            if self.opt_grant.get():   flags.append('-g')
+            self._log(f"Installing {os.path.basename(path)}...")
+            out, err, rc = _r(
+                f"adb -s {self._device} install {' '.join(flags)} '{path}'",
+                timeout=120)
+            if 'Success' in out or rc == 0:
+                self._log("✓ APK installed successfully")
+            else:
+                self._log(f"✗ Install failed: {out or err}")
+                if 'UNKNOWN_SOURCES' in (out+err):
+                    self._log("→ Fix: Settings → Security → Install Unknown Apps → Allow")
+                elif 'DOWNGRADE' in (out+err):
+                    self._log("→ The installed version is newer. Uninstall first.")
+        threading.Thread(target=_do, daemon=True).start()
+
+    # ── Data sync ─────────────────────────────────────────────
 
     def _need_device(self):
         if not self._device:
-            self._log("No device connected. Connect phone and tap RESCAN.")
+            self._log("No device. Connect phone and tap ↺ RESCAN.")
             return False
         return True
 
     def _pull_calls(self):
         if not self._need_device(): return
-        threading.Thread(target=self._do_pull_calls, daemon=True).start()
-
-    def _do_pull_calls(self):
-        self.after(0, self._log, "Pulling call log from phone...")
-        out, err, rc = run(
-            f'adb -s {self._device} shell content query '
-            '--uri content://call_log/calls '
-            '--projection number:date:duration:type:name '
-            '2>/dev/null | head -50', timeout=15)
-        if rc == 0 and out:
-            lines = out.strip().split('\n')
-            self.after(0, self._log, f"Got {len(lines)} call records")
-            for line in lines[:10]:
-                self.after(0, self._log, f"  {line[:80]}")
-            # Save to file
-            with open(os.path.expanduser('~/mint-scan-calls.txt'), 'w') as f:
-                f.write(out)
-            self.after(0, self._log, "Saved to ~/mint-scan-calls.txt")
-        else:
-            self.after(0, self._log, f"Failed: {err[:100]}")
-            self.after(0, self._log, "Note: Some phones restrict call log access via ADB.")
+        def _do():
+            self._log("Pulling call log...")
+            out, err, rc = _r(
+                f"adb -s {self._device} shell content query "
+                "--uri content://call_log/calls "
+                "--projection number:date:duration:type:name 2>/dev/null | head -60",
+                timeout=15)
+            if rc == 0 and out:
+                save = os.path.expanduser('~/mint-scan-calls.txt')
+                open(save,'w').write(out)
+                self._log(f"✓ {len(out.splitlines())} call records → {save}")
+            else:
+                self._log(f"Could not read call log: {err[:80]}")
+        threading.Thread(target=_do, daemon=True).start()
 
     def _pull_sms(self):
         if not self._need_device(): return
-        threading.Thread(target=self._do_pull_sms, daemon=True).start()
-
-    def _do_pull_sms(self):
-        self.after(0, self._log, "Pulling SMS messages...")
-        out, err, rc = run(
-            f'adb -s {self._device} shell content query '
-            '--uri content://sms/inbox '
-            '--projection address:date:body '
-            '2>/dev/null | head -30', timeout=15)
-        if rc == 0 and out:
-            lines = out.strip().split('\n')
-            self.after(0, self._log, f"Got {len(lines)} SMS messages")
-            with open(os.path.expanduser('~/mint-scan-sms.txt'), 'w') as f:
-                f.write(out)
-            self.after(0, self._log, "Saved to ~/mint-scan-sms.txt")
-        else:
-            self.after(0, self._log, f"Failed to read SMS: {err[:80]}")
+        def _do():
+            self._log("Pulling SMS...")
+            out, err, rc = _r(
+                f"adb -s {self._device} shell content query "
+                "--uri content://sms/inbox "
+                "--projection address:date:body 2>/dev/null | head -40",
+                timeout=15)
+            if rc == 0 and out:
+                save = os.path.expanduser('~/mint-scan-sms.txt')
+                open(save,'w').write(out)
+                self._log(f"✓ Pulled SMS → {save}")
+            else:
+                self._log(f"Could not read SMS: {err[:80]}")
+        threading.Thread(target=_do, daemon=True).start()
 
     def _pull_contacts(self):
         if not self._need_device(): return
-        threading.Thread(target=self._do_pull_contacts, daemon=True).start()
-
-    def _do_pull_contacts(self):
-        self.after(0, self._log, "Pulling contacts...")
-        out, err, rc = run(
-            f'adb -s {self._device} shell content query '
-            '--uri content://contacts/phones/ '
-            '--projection display_name:number '
-            '2>/dev/null | head -50', timeout=15)
-        if rc == 0 and out:
-            lines = out.strip().split('\n')
-            self.after(0, self._log, f"Got {len(lines)} contacts")
-            with open(os.path.expanduser('~/mint-scan-contacts.txt'), 'w') as f:
-                f.write(out)
-            self.after(0, self._log, "Saved to ~/mint-scan-contacts.txt")
-        else:
-            self.after(0, self._log, f"Failed: {err[:80]}")
+        def _do():
+            self._log("Pulling contacts...")
+            out, err, rc = _r(
+                f"adb -s {self._device} shell content query "
+                "--uri content://contacts/phones/ "
+                "--projection display_name:number 2>/dev/null | head -60",
+                timeout=15)
+            if rc == 0 and out:
+                save = os.path.expanduser('~/mint-scan-contacts.txt')
+                open(save,'w').write(out)
+                self._log(f"✓ Pulled contacts → {save}")
+            else:
+                self._log(f"Could not read contacts: {err[:80]}")
+        threading.Thread(target=_do, daemon=True).start()
 
     def _pull_wifi(self):
         if not self._need_device(): return
-        threading.Thread(target=self._do_pull_wifi, daemon=True).start()
-
-    def _do_pull_wifi(self):
-        self.after(0, self._log, "Reading Wi-Fi networks from phone...")
-        # Try wpa_supplicant.conf (requires root on modern Android)
-        out, _, rc = run(
-            f'adb -s {self._device} shell su -c '
-            '"cat /data/misc/wifi/WifiConfigStore.xml" 2>/dev/null', timeout=10)
-        if rc == 0 and 'SSID' in out:
-            ssids = re.findall(r'<string name="SSID">&quot;(.+?)&quot;</string>', out)
-            pwds  = re.findall(r'<string name="PreSharedKey">&quot;(.+?)&quot;</string>', out)
-            self.after(0, self._log, f"Found {len(ssids)} saved networks (root)")
-            for i, ssid in enumerate(ssids[:20]):
-                pwd = pwds[i] if i < len(pwds) else '(no password/enterprise)'
-                self.after(0, self._log, f"  {ssid}: {pwd}")
-            with open(os.path.expanduser('~/mint-scan-wifi.txt'), 'w') as f:
-                for i, ssid in enumerate(ssids):
-                    pwd = pwds[i] if i < len(pwds) else '(no password)'
-                    f.write(f"{ssid}\t{pwd}\n")
-            self.after(0, self._log, "Saved to ~/mint-scan-wifi.txt")
-        else:
-            # Try non-root backup method
-            out2, _, _ = run(
-                f'adb -s {self._device} shell cmd wifi list-networks 2>/dev/null', timeout=10)
-            if out2:
-                self.after(0, self._log, f"Networks (no passwords - requires root for passwords):\n{out2[:500]}")
+        def _do():
+            self._log("Reading Wi-Fi networks...")
+            out, _, _ = _r(
+                f"adb -s {self._device} shell cmd wifi list-networks 2>/dev/null")
+            if out:
+                self._log(f"Wi-Fi networks:\n{out}")
             else:
-                self.after(0, self._log,
-                    "Wi-Fi password access requires root on Android 10+.\n"
-                    "Network names listed above. Passwords require rooted device.")
+                self._log("Could not list Wi-Fi (some phones restrict this)")
+        threading.Thread(target=_do, daemon=True).start()
 
-    def _pull_screenshots(self):
+    def _screenshot(self):
         if not self._need_device(): return
-        threading.Thread(target=self._do_screenshots, daemon=True).start()
-
-    def _do_screenshots(self):
-        self.after(0, self._log, "Taking screenshot...")
-        run(f'adb -s {self._device} shell screencap -p /sdcard/mint_scan_screen.png', timeout=10)
-        out, err, rc = run(
-            f'adb -s {self._device} pull /sdcard/mint_scan_screen.png '
-            f'{os.path.expanduser("~/mint-scan-screenshot.png")}', timeout=15)
-        if rc == 0:
-            self.after(0, self._log, "Screenshot saved: ~/mint-scan-screenshot.png")
-        else:
-            self.after(0, self._log, f"Failed: {err[:80]}")
+        def _do():
+            self._log("Taking screenshot...")
+            _r(f"adb -s {self._device} shell screencap -p /sdcard/mint_screen.png")
+            save = os.path.expanduser('~/mint-scan-screenshot.png')
+            out, err, rc = _r(
+                f"adb -s {self._device} pull /sdcard/mint_screen.png '{save}'")
+            self._log(f"✓ Screenshot → {save}" if rc==0 else f"✗ {err[:60]}")
+        threading.Thread(target=_do, daemon=True).start()
 
     def _phone_battery(self):
         if not self._need_device(): return
-        out, _, _ = run(f'adb -s {self._device} shell dumpsys battery', timeout=8)
-        self.after(0, self._log, f"Battery info:\n{out[:400]}")
+        def _do():
+            out, _, _ = _r(
+                f"adb -s {self._device} shell dumpsys battery 2>/dev/null")
+            self._log(f"Battery info:\n{out[:400]}")
+        threading.Thread(target=_do, daemon=True).start()
 
     def _phone_info(self):
         if not self._need_device(): return
-        threading.Thread(target=self._do_phone_info, daemon=True).start()
+        def _do():
+            self._log("Device info:")
+            for prop, lbl in [
+                ('ro.product.brand','Brand'),
+                ('ro.product.model','Model'),
+                ('ro.build.version.release','Android'),
+                ('ro.build.version.sdk','API Level'),
+                ('ro.product.cpu.abi','CPU'),
+                ('gsm.sim.operator.alpha','Carrier'),
+            ]:
+                val, _, _ = _r(
+                    f"adb -s {self._device} shell getprop {prop} 2>/dev/null")
+                self._log(f"  {lbl}: {val or '—'}")
+        threading.Thread(target=_do, daemon=True).start()
 
-    def _do_phone_info(self):
-        props = [
-            ('ro.product.brand',          'Brand'),
-            ('ro.product.model',          'Model'),
-            ('ro.build.version.release',  'Android'),
-            ('ro.build.version.sdk',      'API Level'),
-            ('ro.product.cpu.abi',        'CPU ABI'),
-            ('ro.build.fingerprint',      'Build'),
-            ('gsm.network.type',          'Network Type'),
-            ('gsm.sim.operator.alpha',    'Carrier'),
-        ]
-        for prop, label in props:
-            val, _, _ = run(f'adb -s {self._device} shell getprop {prop}')
-            self.after(0, self._log, f"  {label}: {val or '—'}")
-
-    def _start_sync(self):
+    def _full_sync(self):
         if not self._need_device(): return
         self._log("Starting full sync...")
-        self._do_pull_calls()
-        time.sleep(1)
-        self._do_pull_sms()
-        time.sleep(1)
-        self._do_pull_contacts()
-        self._log("✓ Full sync complete. Files saved to home directory.")
+        self._install_companion()
+        for fn in [self._pull_calls, self._pull_sms,
+                   self._pull_contacts, self._screenshot]:
+            time.sleep(0.8)
+            fn()
+        self._log("✓ Full sync complete")
 
-    def _install_adb(self):
-        install_adb(self, on_done=lambda: self.after(500,
-            threading.Thread(target=self._detect, daemon=True).start))
+
+# Keep ApkScreen as an alias so app.py doesn't break if it references it
+ApkScreen = UsbScreen
