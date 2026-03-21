@@ -4,8 +4,8 @@ import customtkinter as ctk
 import threading
 import time
 import socket
-from src.utils import C, MONO, MONO_SM, get_network_interfaces, get_public_ip_info, get_local_ip, get_active_connections, ping, run_cmd
-from src.widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, LiveBadge
+from utils import C, MONO, MONO_SM, get_network_interfaces, get_public_ip_info, get_local_ip, get_active_connections, ping, run_cmd
+from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, LiveBadge
 
 
 class NetworkScreen(ctk.CTkFrame):

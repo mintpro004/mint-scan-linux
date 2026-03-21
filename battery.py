@@ -2,8 +2,8 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, time
-from src.utils import C, MONO, MONO_SM, get_battery_info
-from src.widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
+from utils import C, MONO, MONO_SM, get_battery_info
+from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 
 
 class BatteryScreen(ctk.CTkFrame):

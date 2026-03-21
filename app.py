@@ -171,15 +171,15 @@ class MintScanApp:
         self.content.pack(fill='both', expand=True, side='left')
 
         # Import screens here to avoid circular imports
-        from src.screens.dash     import DashScreen
-        from src.screens.perms    import PermsScreen
-        from src.screens.wifi     import WifiScreen
-        from src.screens.calls    import CallsScreen
-        from src.screens.network  import NetworkScreen
-        from src.screens.battery  import BatteryScreen
-        from src.screens.threats  import ThreatsScreen
-        from src.screens.notifs   import NotifsScreen
-        from src.screens.ports    import PortsScreen
+        from dash     import DashScreen
+        from perms    import PermsScreen
+        from wifi     import WifiScreen
+        from calls    import CallsScreen
+        from network  import NetworkScreen
+        from battery  import BatteryScreen
+        from threats  import ThreatsScreen
+        from notifs   import NotifsScreen
+        from ports    import PortsScreen
 
         screen_classes = {
             'dash':    DashScreen,

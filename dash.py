@@ -4,8 +4,8 @@ import customtkinter as ctk
 import threading
 import platform
 import socket
-from src.utils import C, MONO, MONO_SM, MONO_LG, MONO_XL, get_system_info, get_public_ip_info, get_local_ip, get_battery_info
-from src.widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
+from utils import C, MONO, MONO_SM, MONO_LG, MONO_XL, get_system_info, get_public_ip_info, get_local_ip, get_battery_info
+from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 
 
 class DashScreen(ctk.CTkFrame):

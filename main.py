@@ -2,14 +2,16 @@
 """
 Mint Scan v6 — Linux Desktop Security Auditor
 by Mint Projects, Pretoria
+github.com/mintpro004
 """
 import sys
 import os
 
-# Ensure src is on path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add current directory to path so all modules resolve flat
+BASE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE)
 
-from src.app import MintScanApp
+from app import MintScanApp
 
 if __name__ == '__main__':
     app = MintScanApp()

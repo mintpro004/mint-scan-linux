@@ -2,8 +2,8 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, os, re
-from src.utils import C, MONO, MONO_SM, run_cmd, check_root, get_open_ports
-from src.widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn
+from utils import C, MONO, MONO_SM, run_cmd, check_root, get_open_ports
+from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn
 
 
 KNOWN_BAD_PORTS = {'23': 'Telnet', '4444': 'Metasploit', '1337': 'Suspicious',

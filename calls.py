@@ -3,8 +3,8 @@ import tkinter as tk
 import customtkinter as ctk
 import threading
 import os, re
-from src.utils import C, MONO, MONO_SM, run_cmd, analyse_phone_number, SA_OPERATORS
-from src.widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
+from utils import C, MONO, MONO_SM, run_cmd, analyse_phone_number, SA_OPERATORS
+from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 
 
 def get_gnome_calls():

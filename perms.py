@@ -2,8 +2,8 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, os, stat
-from src.utils import C, MONO, MONO_SM, run_cmd, check_root
-from src.widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
+from utils import C, MONO, MONO_SM, run_cmd, check_root
+from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 
 
 class PermsScreen(ctk.CTkFrame):

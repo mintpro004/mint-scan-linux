@@ -2,8 +2,8 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, socket, re
-from src.utils import C, MONO, MONO_SM, run_cmd, get_open_ports, get_active_connections
-from src.widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn, PortBar
+from utils import C, MONO, MONO_SM, run_cmd, get_open_ports, get_active_connections
+from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn, PortBar
 
 
 WELL_KNOWN = {

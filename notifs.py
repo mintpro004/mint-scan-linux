@@ -2,8 +2,8 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading, time, subprocess
-from src.utils import C, MONO, MONO_SM, run_cmd
-from src.widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn
+from utils import C, MONO, MONO_SM, run_cmd
+from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn
 
 
 class NotifsScreen(ctk.CTkFrame):

@@ -1,7 +1,7 @@
 """Reusable GUI widgets for Mint Scan Linux"""
 import tkinter as tk
 import customtkinter as ctk
-from src.utils import C, MONO, MONO_SM, MONO_LG
+from utils import C, MONO, MONO_SM, MONO_LG
 
 
 class ScrollableFrame(ctk.CTkScrollableFrame):

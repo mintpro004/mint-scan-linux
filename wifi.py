@@ -2,8 +2,8 @@
 import tkinter as tk
 import customtkinter as ctk
 import threading
-from src.utils import C, MONO, MONO_SM, get_wifi_networks, get_current_wifi, get_wifi_interface, get_network_interfaces
-from src.widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
+from utils import C, MONO, MONO_SM, get_wifi_networks, get_current_wifi, get_wifi_interface, get_network_interfaces
+from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 
 
 def sig_color(sig):
