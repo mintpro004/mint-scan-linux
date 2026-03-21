@@ -106,6 +106,7 @@ class PermsScreen(ctk.CTkFrame):
                       'Running security tools as root can be dangerous. Use a regular user account.').pack(fill='x', pady=4)
 
         # Device files
+        if not hasattr(self,"dev_frame"): return
         for w in self.dev_frame.winfo_children(): w.destroy()
         items = []
         for dev, info in r['devices'].items():

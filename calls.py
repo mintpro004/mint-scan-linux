@@ -130,6 +130,7 @@ class CallsScreen(ctk.CTkFrame):
         self.after(0, self._render_calls, calls)
 
     def _render_calls(self, calls):
+        if not hasattr(self, "calls_frame"): return
         for w in self.calls_frame.winfo_children():
             w.destroy()
 
@@ -176,7 +177,7 @@ class CallsScreen(ctk.CTkFrame):
                          text_color=C['wn']).pack(anchor='w')
 
         if risk != 'LOW':
-            badge = ctk.CTkFrame(row, fg_color=rcolor+'22',
+            badge = ctk.CTkFrame(row, fg_color=rcolor,
                                   border_color=rcolor, border_width=1, corner_radius=3)
             badge.pack(side='right', padx=12)
             ctk.CTkLabel(badge, text=risk, font=('Courier', 7, 'bold'),

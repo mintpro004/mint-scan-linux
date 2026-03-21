@@ -102,6 +102,7 @@ class NetworkScreen(ctk.CTkFrame):
 
     def _render(self, ifaces, ipinfo, conns):
         # Interfaces
+        if not hasattr(self,"iface_frame"): return
         for w in self.iface_frame.winfo_children(): w.destroy()
         items = []
         for iface in ifaces[:8]:
@@ -112,6 +113,7 @@ class NetworkScreen(ctk.CTkFrame):
         InfoGrid(self.iface_frame, items, columns=4).pack(fill='x')
 
         # Public identity
+        if not hasattr(self,"pub_grid_frame"): return
         for w in self.pub_grid_frame.winfo_children(): w.destroy()
         InfoGrid(self.pub_grid_frame, [
             ('PUBLIC IP',  ipinfo.get('ip','—'),           C['wn']),

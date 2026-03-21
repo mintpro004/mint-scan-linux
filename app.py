@@ -1,5 +1,5 @@
 """
-Mint Scan v6 — Main Application
+Mint Scan v7 — Main Application
 Full GUI desktop security auditor for Linux
 """
 import tkinter as tk
@@ -38,7 +38,7 @@ MONO_LG = ('Courier', 14)
 MONO_XL = ('Courier', 28, 'bold')
 
 BOOT_LINES = [
-    "INITIALISING MINT SCAN v6.0...",
+    "INITIALISING MINT SCAN v7.0...",
     "LOADING SYSTEM LIBRARIES...",
     "PROBING NETWORK INTERFACES...",
     "SCANNING WIFI SUBSYSTEM...",
@@ -53,7 +53,7 @@ BOOT_LINES = [
 class MintScanApp:
     def __init__(self):
         self.root = ctk.CTk()
-        self.root.title("Mint Scan v6 — Security Auditor")
+        self.root.title("Mint Scan v7 — Security Auditor")
         self.root.geometry("1100x720")
         self.root.minsize(900, 600)
         self.root.configure(fg_color=C['bg'])
@@ -82,7 +82,7 @@ class MintScanApp:
 
         ctk.CTkLabel(inner, text="[ MINT SCAN ]",
                      font=('Courier', 32, 'bold'), text_color=C['ac']).pack(anchor='w')
-        ctk.CTkLabel(inner, text="SECURITY AUDITOR v6.0 — MINT PROJECTS",
+        ctk.CTkLabel(inner, text="SECURITY AUDITOR v7.0 — MINT PROJECTS",
                      font=MONO_SM, text_color=C['mu']).pack(anchor='w', pady=(0, 20))
 
         self.boot_log = ctk.CTkTextbox(inner, width=480, height=220,
@@ -119,7 +119,7 @@ class MintScanApp:
         ctk.CTkLabel(self.navbar, text="[ MINT SCAN ]",
                      font=('Courier', 15, 'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
-        ctk.CTkLabel(self.navbar, text="v6.0",
+        ctk.CTkLabel(self.navbar, text="v7.0",
                      font=MONO_SM, text_color=C['mu']
                      ).pack(side='left', padx=2)
 
@@ -147,6 +147,10 @@ class MintScanApp:
             ('⚠  THREATS',    'threats'),
             ('🔔 NOTIFS',     'notifs'),
             ('🔍 PORT SCAN',  'ports'),
+            ('📱 USB SYNC',   'usb'),
+            ('🔬 NET SCAN',   'netscan'),
+            ('🦠 MALWARE',    'malware'),
+            ('🔧 SYS FIX',    'sysfix'),
         ]
 
         self._tab_btns = {}
@@ -191,6 +195,10 @@ class MintScanApp:
             'threats': ThreatsScreen,
             'notifs':  NotifsScreen,
             'ports':   PortsScreen,
+            'usb':     UsbScreen,
+            'netscan': NetScanScreen,
+            'malware': MalwareScreen,
+            'sysfix':  SysFixScreen,
         }
 
         for key, cls in screen_classes.items():

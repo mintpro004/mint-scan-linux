@@ -195,7 +195,7 @@ class WifiScreen(ctk.CTkFrame):
         right.pack(side='right', padx=12, pady=8)
 
         # Security badge
-        badge = ctk.CTkFrame(right, fg_color=col + '22',
+        badge = ctk.CTkFrame(right, fg_color=col,
                               border_color=col, border_width=1, corner_radius=3)
         badge.pack(pady=(0, 4))
         ctk.CTkLabel(badge, text=sec[:8],

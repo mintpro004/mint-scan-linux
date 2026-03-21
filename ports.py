@@ -90,6 +90,8 @@ class PortsScreen(ctk.CTkFrame):
         self.after(0, self._render_local, ports, conns)
 
     def _render_local(self, ports, conns):
+        if not hasattr(self, "local_frame"): return
+        if not hasattr(self,"local_frame"): return
         for w in self.local_frame.winfo_children(): w.destroy()
         if not ports:
             ctk.CTkLabel(self.local_frame, text="No open ports detected (requires ss/netstat)",
@@ -99,6 +101,8 @@ class PortsScreen(ctk.CTkFrame):
             PortBar(self.local_frame, p['port'], p['proto'],
                     p['state'], p['process']).pack(fill='x', pady=3)
 
+        if not hasattr(self, "conns_frame"): return
+        if not hasattr(self,"conns_frame"): return
         for w in self.conns_frame.winfo_children(): w.destroy()
         if conns:
             for c in conns[:20]:
