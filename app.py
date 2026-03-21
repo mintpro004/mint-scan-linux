@@ -184,6 +184,10 @@ class MintScanApp:
         from threats  import ThreatsScreen
         from notifs   import NotifsScreen
         from ports    import PortsScreen
+        from usb      import UsbScreen
+        from netscan  import NetScanScreen
+        from malware  import MalwareScreen
+        from sysfix   import SysFixScreen
 
         screen_classes = {
             'dash':    DashScreen,
