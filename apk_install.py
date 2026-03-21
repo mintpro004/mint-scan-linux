@@ -1,12 +1,14 @@
-"""APK Installer — push and install APK files to Android phone via USB"""
+"""
+APK Installer — install any APK to Android phone via USB.
+Also installs Mint Scan Companion APK if provided.
+"""
 import tkinter as tk
 import customtkinter as ctk
-import threading, subprocess, os, re, time
-from installer import install_adb
+import threading, subprocess, os, re, time, shutil
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
+from installer import install_adb, InstallerPopup
 
-
-def run(cmd, timeout=30):
+def _r(cmd, timeout=20):
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip(), r.stderr.strip(), r.returncode
@@ -18,284 +20,234 @@ class ApkScreen(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
-        self._built = False
+        self._built  = False
         self._device = None
-        self._apk_path = None
 
     def on_focus(self):
         if not self._built:
             self._build()
             self._built = True
-        threading.Thread(target=self._detect_device, daemon=True).start()
+        threading.Thread(target=self._detect, daemon=True).start()
 
     def _build(self):
-        hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
+        hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=52, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="📦  APK INSTALLER", font=('Courier',13,'bold'),
-                     text_color=C['ac']).pack(side='left', padx=16)
-        self.dev_lbl = ctk.CTkLabel(hdr, text="● Detecting device...",
+        hdr.pack_propagate(False)
+        ctk.CTkLabel(hdr, text="📦  APK INSTALLER",
+                     font=('Courier',13,'bold'), text_color=C['ac']
+                     ).pack(side='left', padx=16)
+        self.dev_lbl = ctk.CTkLabel(hdr, text="● Scanning...",
                                      font=MONO_SM, text_color=C['mu'])
         self.dev_lbl.pack(side='left', padx=8)
-        Btn(hdr, "↺ RESCAN", command=lambda: threading.Thread(
-            target=self._detect_device, daemon=True).start(),
-            variant='ghost', width=90).pack(side='right', padx=12, pady=6)
+        Btn(hdr, "↺ RESCAN",
+            command=lambda: threading.Thread(target=self._detect, daemon=True).start(),
+            variant='ghost', width=90).pack(side='right', padx=8, pady=8)
 
         self.scroll = ScrollableFrame(self)
         self.scroll.pack(fill='both', expand=True)
         body = self.scroll
 
-        # ── HOW IT WORKS ────────────────────────────────────
-        SectionHeader(body, '01', 'SETUP').pack(fill='x', padx=14, pady=(14,4))
+        # ── ADB status ───────────────────────────────────────
+        SectionHeader(body,'01','SETUP').pack(fill='x', padx=14, pady=(14,4))
         setup = Card(body, accent=C['bl'])
         setup.pack(fill='x', padx=14, pady=(0,8))
-        ctk.CTkLabel(setup,
-            text="Install any APK file onto your Android phone via USB.\n\n"
-                 "Requirements:\n"
-                 "  • USB cable connected to Chromebook\n"
-                 "  • USB Debugging enabled on phone\n"
-                 "  • Settings → Security → Unknown Sources → Allow\n"
-                 "  • ADB installed on Chromebook",
-            font=MONO_SM, text_color=C['mu'], justify='left'
-        ).pack(anchor='w', padx=12, pady=(10,10))
-        Btn(setup, "INSTALL ADB: sudo apt install adb",
-            command=self._install_adb, variant='blue', width=300
-        ).pack(anchor='w', padx=12, pady=(0,10))
 
-        # ── DEVICE STATUS ────────────────────────────────────
-        SectionHeader(body, '02', 'CONNECTED DEVICE').pack(fill='x', padx=14, pady=(10,4))
+        # Check ADB installed
+        adb_ok = shutil.which('adb') is not None
+        if adb_ok:
+            ResultBox(setup,'ok','✓ ADB Installed',
+                      'Android Debug Bridge is ready.').pack(fill='x', padx=8, pady=(8,4))
+        else:
+            ResultBox(setup,'warn','⚠ ADB Not Installed',
+                      'Required to communicate with your Android phone via USB.'
+                      ).pack(fill='x', padx=8, pady=(8,4))
+            Btn(setup, "⬇ INSTALL ADB",
+                command=lambda: install_adb(self, on_done=lambda: threading.Thread(
+                    target=self._detect, daemon=True).start()),
+                variant='primary', width=180).pack(anchor='w', padx=12, pady=(0,10))
+
+        ctk.CTkLabel(setup,
+            text="Phone setup:\n"
+                 "  1. Settings → About Phone → tap Build Number 7 times\n"
+                 "  2. Settings → Developer Options → USB Debugging → ON\n"
+                 "  3. Connect USB cable → tap Allow on phone",
+            font=('Courier',8), text_color=C['mu'], justify='left'
+        ).pack(anchor='w', padx=12, pady=(4,10))
+
+        # ── Device status ────────────────────────────────────
+        SectionHeader(body,'02','CONNECTED DEVICE').pack(fill='x', padx=14, pady=(10,4))
         self.dev_card = Card(body)
         self.dev_card.pack(fill='x', padx=14, pady=(0,8))
         self.dev_info = ctk.CTkLabel(self.dev_card,
-            text="Scanning for connected Android device...",
+            text="No device detected. Connect phone and tap ↺ RESCAN",
             font=MONO_SM, text_color=C['mu'])
         self.dev_info.pack(padx=12, pady=12)
 
-        # ── APK FILE SELECTION ───────────────────────────────
-        SectionHeader(body, '03', 'SELECT APK FILE').pack(fill='x', padx=14, pady=(10,4))
+        # ── APK file selection ───────────────────────────────
+        SectionHeader(body,'03','SELECT APK FILE').pack(fill='x', padx=14, pady=(10,4))
         apk_card = Card(body)
         apk_card.pack(fill='x', padx=14, pady=(0,8))
 
         ctk.CTkLabel(apk_card,
-            text="Enter the full path to your APK file, or browse:",
-            font=MONO_SM, text_color=C['mu']
-        ).pack(anchor='w', padx=12, pady=(10,4))
-
-        inp_row = ctk.CTkFrame(apk_card, fg_color='transparent')
-        inp_row.pack(fill='x', padx=12, pady=(0,8))
-        self.apk_entry = ctk.CTkEntry(inp_row,
-            placeholder_text="e.g. /home/mint/Downloads/myapp.apk",
-            font=MONO_SM, fg_color=C['bg'], border_color=C['br'],
-            text_color=C['tx'], height=36)
+                     text="Enter full path to APK, or use Browse:",
+                     font=MONO_SM, text_color=C['mu']
+                     ).pack(anchor='w', padx=12, pady=(10,4))
+        inp = ctk.CTkFrame(apk_card, fg_color='transparent')
+        inp.pack(fill='x', padx=12, pady=(0,8))
+        self.apk_entry = ctk.CTkEntry(inp,
+            placeholder_text="/home/mint/Downloads/app.apk",
+            font=MONO_SM, fg_color=C['bg'],
+            border_color=C['br'], text_color=C['tx'], height=36)
         self.apk_entry.pack(side='left', fill='x', expand=True, padx=(0,8))
-        Btn(inp_row, "BROWSE", command=self._browse_apk,
-            variant='ghost', width=80).pack(side='left')
+        Btn(inp,'BROWSE', command=self._browse, variant='ghost', width=80).pack(side='left')
+        self.apk_info_lbl = ctk.CTkLabel(apk_card, text="",
+                                          font=('Courier',8), text_color=C['mu'])
+        self.apk_info_lbl.pack(anchor='w', padx=12, pady=(0,6))
 
-        # APK info display
-        self.apk_info = ctk.CTkFrame(apk_card, fg_color='transparent')
-        self.apk_info.pack(fill='x', padx=12, pady=(0,8))
+        # ── Install options ──────────────────────────────────
+        SectionHeader(body,'04','OPTIONS').pack(fill='x', padx=14, pady=(10,4))
+        opts = Card(body)
+        opts.pack(fill='x', padx=14, pady=(0,8))
+        og = ctk.CTkFrame(opts, fg_color='transparent')
+        og.pack(fill='x', padx=12, pady=10)
+        self.opt_replace   = ctk.BooleanVar(value=True)
+        self.opt_grant     = ctk.BooleanVar(value=True)
+        self.opt_downgrade = ctk.BooleanVar(value=False)
+        for var, label in [
+            (self.opt_replace,   "Replace existing app (-r)"),
+            (self.opt_grant,     "Grant all permissions (-g)"),
+            (self.opt_downgrade, "Allow downgrade (-d)"),
+        ]:
+            ctk.CTkCheckBox(og, text=label, variable=var,
+                            font=MONO_SM, text_color=C['tx'],
+                            checkmark_color=C['bg'], fg_color=C['ac'],
+                            border_color=C['br'], hover_color=C['br2']
+                            ).pack(anchor='w', pady=3)
 
-        # ── INSTALL OPTIONS ──────────────────────────────────
-        SectionHeader(body, '04', 'INSTALL OPTIONS').pack(fill='x', padx=14, pady=(10,4))
-        opts_card = Card(body)
-        opts_card.pack(fill='x', padx=14, pady=(0,8))
-
-        opt_row1 = ctk.CTkFrame(opts_card, fg_color='transparent')
-        opt_row1.pack(fill='x', padx=12, pady=(10,4))
-        self.allow_downgrade = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(opt_row1, text="Allow version downgrade (-d flag)",
-                        variable=self.allow_downgrade, font=MONO_SM,
-                        text_color=C['tx'], checkmark_color=C['bg'],
-                        fg_color=C['ac'], border_color=C['br']
-                        ).pack(side='left')
-
-        opt_row2 = ctk.CTkFrame(opts_card, fg_color='transparent')
-        opt_row2.pack(fill='x', padx=12, pady=(4,4))
-        self.grant_perms = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(opt_row2, text="Grant all permissions on install (-g flag)",
-                        variable=self.grant_perms, font=MONO_SM,
-                        text_color=C['tx'], checkmark_color=C['bg'],
-                        fg_color=C['ac'], border_color=C['br']
-                        ).pack(side='left')
-
-        opt_row3 = ctk.CTkFrame(opts_card, fg_color='transparent')
-        opt_row3.pack(fill='x', padx=12, pady=(4,10))
-        self.replace_existing = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(opt_row3, text="Replace existing installation (-r flag)",
-                        variable=self.replace_existing, font=MONO_SM,
-                        text_color=C['tx'], checkmark_color=C['bg'],
-                        fg_color=C['ac'], border_color=C['br']
-                        ).pack(side='left')
-
-        # ── INSTALL BUTTON ───────────────────────────────────
-        SectionHeader(body, '05', 'INSTALL').pack(fill='x', padx=14, pady=(10,4))
+        # ── Install button ───────────────────────────────────
+        SectionHeader(body,'05','INSTALL').pack(fill='x', padx=14, pady=(10,4))
         inst_card = Card(body)
         inst_card.pack(fill='x', padx=14, pady=(0,8))
-
         btn_row = ctk.CTkFrame(inst_card, fg_color='transparent')
         btn_row.pack(fill='x', padx=12, pady=10)
         self.install_btn = Btn(btn_row, "📦 INSTALL APK TO PHONE",
-                                command=self._install_apk, width=240)
+                                command=self._install, width=240)
         self.install_btn.pack(side='left', padx=(0,8))
-        Btn(btn_row, "📋 LIST INSTALLED APPS",
-            command=self._list_apps, variant='ghost', width=180
-            ).pack(side='left')
+        Btn(btn_row, "📋 LIST APPS",
+            command=self._list_apps, variant='ghost', width=120).pack(side='left')
 
-        # Progress / output
-        self.progress = ctk.CTkProgressBar(inst_card, height=6,
-                                            progress_color=C['ac'], fg_color=C['br'])
-        self.progress.pack(fill='x', padx=12, pady=(0,6))
-        self.progress.set(0)
+        self.prog = ctk.CTkProgressBar(inst_card, height=5,
+                                        progress_color=C['ac'], fg_color=C['br'])
+        self.prog.pack(fill='x', padx=12, pady=(0,6))
+        self.prog.set(0)
 
-        self.output = ctk.CTkTextbox(inst_card, height=160, font=('Courier',9),
+        self.output = ctk.CTkTextbox(inst_card, height=150, font=('Courier',8),
                                       fg_color=C['bg'], text_color=C['ok'],
                                       border_width=0)
         self.output.pack(fill='x', padx=8, pady=(0,8))
         self.output.configure(state='disabled')
+        ctk.CTkLabel(body, text="", height=16).pack()
 
-        ctk.CTkLabel(body, text="", height=20).pack()
+    # ── Helpers ───────────────────────────────────────────────
 
-    def _log(self, msg, color=None):
-        self.output.configure(state='normal')
-        self.output.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
-        self.output.see('end')
-        self.output.configure(state='disabled')
+    def _log(self, msg):
+        def _do():
+            self.output.configure(state='normal')
+            self.output.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+            self.output.see('end')
+            self.output.configure(state='disabled')
+        self.after(0, _do)
 
-    def _detect_device(self):
-        out, _, rc = run('adb devices 2>/dev/null')
-        if rc != 0:
+    def _detect(self):
+        if not shutil.which('adb'):
             self.after(0, lambda: (
-                self.dev_lbl.configure(text='● ADB NOT INSTALLED', text_color=C['wn']),
-                self.dev_info.configure(
-                    text='ADB not found. Run: sudo apt install adb', text_color=C['wn'])
+                self.dev_lbl.configure(text='● ADB not installed', text_color=C['wn']),
+                self.dev_info.configure(text='Install ADB first — see setup section above.')
             ))
             return
-
+        out, _, rc = _r("adb devices 2>/dev/null")
         lines = [l for l in out.split('\n')[1:] if '\t' in l and 'offline' not in l]
         if not lines:
-            self.after(0, lambda: (
-                self.dev_lbl.configure(text='● NO DEVICE DETECTED', text_color=C['wn']),
-                self.dev_info.configure(
-                    text='No device found.\n1. Connect USB cable\n2. Enable USB Debugging\n3. Tap Allow on phone', text_color=C['wn'])
-            ))
             self._device = None
+            self.after(0, lambda: (
+                self.dev_lbl.configure(text='● No device', text_color=C['wn']),
+                self.dev_info.configure(
+                    text='No Android device found.\n'
+                         '1. Connect USB cable\n'
+                         '2. Enable USB Debugging\n'
+                         '3. Tap Allow on phone\n'
+                         '4. Tap ↺ RESCAN', text_color=C['wn'])
+            ))
             return
-
         serial = lines[0].split('\t')[0]
         self._device = serial
-        model, _, _ = run(f'adb -s {serial} shell getprop ro.product.model')
-        brand, _, _ = run(f'adb -s {serial} shell getprop ro.product.brand')
-        android, _, _ = run(f'adb -s {serial} shell getprop ro.build.version.release')
-
+        model,  _, _ = _r(f"adb -s {serial} shell getprop ro.product.model")
+        brand,  _, _ = _r(f"adb -s {serial} shell getprop ro.product.brand")
+        android,_, _ = _r(f"adb -s {serial} shell getprop ro.build.version.release")
+        bat,    _, _ = _r(f"adb -s {serial} shell dumpsys battery 2>/dev/null | grep level")
+        bat_pct = re.search(r'level: (\d+)', bat)
+        info = (f"✓ {brand} {model}  •  Android {android}  "
+                f"•  Battery {bat_pct.group(1)+'%' if bat_pct else '—'}")
         self.after(0, lambda: (
-            self.dev_lbl.configure(text=f'● {brand} {model}', text_color=C['ok']),
-            self.dev_info.configure(
-                text=f'✓ Connected: {brand} {model}  |  Android {android}  |  Serial: {serial}',
-                text_color=C['ok'])
+            self.dev_lbl.configure(text=f"● {brand} {model}", text_color=C['ok']),
+            self.dev_info.configure(text=info, text_color=C['ok'])
         ))
 
-    def _browse_apk(self):
-        """Open file dialog to select APK"""
+    def _browse(self):
         try:
             import tkinter.filedialog as fd
             path = fd.askopenfilename(
-                title="Select APK file",
-                filetypes=[("Android Package", "*.apk"), ("All files", "*.*")],
-                initialdir=os.path.expanduser("~/Downloads")
-            )
+                title="Select APK",
+                filetypes=[("Android Package","*.apk"),("All","*.*")],
+                initialdir=os.path.expanduser("~/Downloads"))
             if path:
-                self.apk_entry.delete(0, 'end')
+                self.apk_entry.delete(0,'end')
                 self.apk_entry.insert(0, path)
-                self._show_apk_info(path)
+                size = os.path.getsize(path)/1024/1024
+                self.apk_info_lbl.configure(
+                    text=f"File: {os.path.basename(path)}  ({size:.1f} MB)")
         except Exception as e:
-            self._log(f"Browse error: {e}")
+            self._log(f"Browse: {e}")
 
-    def _show_apk_info(self, path):
-        for w in self.apk_info.winfo_children():
-            w.destroy()
-        if not os.path.exists(path):
-            ResultBox(self.apk_info, 'warn', '⚠ FILE NOT FOUND', path).pack(fill='x')
-            return
-        size_mb = os.path.getsize(path) / 1024 / 1024
-        fname = os.path.basename(path)
-        # Try to get package name with aapt
-        pkg, _, _ = run(f"aapt dump badging '{path}' 2>/dev/null | grep 'package: name' | head -1")
-        pkg_name = re.search(r"name='([^']+)'", pkg)
-        pkg_ver  = re.search(r"versionName='([^']+)'", pkg)
-        InfoGrid(self.apk_info, [
-            ('FILE',     fname,                          C['ac']),
-            ('SIZE',     f"{size_mb:.1f} MB"),
-            ('PACKAGE',  pkg_name.group(1) if pkg_name else 'Unknown'),
-            ('VERSION',  pkg_ver.group(1)  if pkg_ver  else 'Unknown'),
-        ], columns=4).pack(fill='x')
-
-    def _install_apk(self):
+    def _install(self):
         if not self._device:
-            self._log("No device connected. Connect phone and tap RESCAN.")
-            return
+            self._log("No device. Connect phone and tap RESCAN."); return
         path = self.apk_entry.get().strip()
         if not path:
-            self._log("No APK selected. Enter or browse for an APK file.")
-            return
+            self._log("No APK selected."); return
         if not os.path.exists(path):
-            self._log(f"File not found: {path}")
-            return
+            self._log(f"File not found: {path}"); return
         self.install_btn.configure(state='disabled', text='INSTALLING...')
-        self.progress.set(0.1)
+        self.prog.set(0.1)
         threading.Thread(target=self._do_install, args=(path,), daemon=True).start()
 
     def _do_install(self, path):
-        self.after(0, self._log, f"Preparing to install: {os.path.basename(path)}")
-        self.after(0, lambda: self.progress.set(0.3))
-
-        # Build flags
         flags = []
-        if self.replace_existing.get():   flags.append('-r')
-        if self.grant_perms.get():         flags.append('-g')
-        if self.allow_downgrade.get():     flags.append('-d')
-        flag_str = ' '.join(flags)
-
-        self.after(0, self._log, f"Running: adb install {flag_str} ...")
-        self.after(0, lambda: self.progress.set(0.5))
-
-        out, err, rc = run(
-            f"adb -s {self._device} install {flag_str} '{path}'",
-            timeout=120)
-
-        self.after(0, lambda: self.progress.set(1.0))
-
+        if self.opt_replace.get():   flags.append('-r')
+        if self.opt_grant.get():     flags.append('-g')
+        if self.opt_downgrade.get(): flags.append('-d')
+        cmd = f"adb -s {self._device} install {' '.join(flags)} '{path}'"
+        self.after(0, lambda: self.prog.set(0.4))
+        self._log(f"Running: adb install {' '.join(flags)} ...")
+        out, err, rc = _r(cmd, timeout=120)
+        self.after(0, lambda: self.prog.set(1.0))
         if 'Success' in out or rc == 0:
-            self.after(0, self._log, f"✓ INSTALLATION SUCCESSFUL")
-            self.after(0, self._log, f"  {out}")
+            self._log("✓ INSTALLATION SUCCESSFUL")
         else:
-            self.after(0, self._log, f"✗ INSTALLATION FAILED")
-            self.after(0, self._log, f"  {out or err}")
-            if 'INSTALL_FAILED_UNKNOWN_SOURCES' in (out+err):
-                self.after(0, self._log,
-                    "Fix: Settings → Security → Install Unknown Apps → Allow")
-            elif 'INSTALL_FAILED_VERSION_DOWNGRADE' in (out+err):
-                self.after(0, self._log,
-                    "Fix: Enable 'Allow version downgrade' option above")
-
+            self._log(f"✗ FAILED: {out or err}")
+            if 'UNKNOWN_SOURCES' in (out+err):
+                self._log("→ Fix: Settings → Security → Install Unknown Apps → Allow")
+            elif 'VERSION_DOWNGRADE' in (out+err):
+                self._log("→ Fix: Enable 'Allow downgrade' option above")
         self.after(0, lambda: self.install_btn.configure(
             state='normal', text='📦 INSTALL APK TO PHONE'))
 
     def _list_apps(self):
         if not self._device:
-            self._log("No device connected.")
-            return
-        threading.Thread(target=self._do_list_apps, daemon=True).start()
-
-    def _do_list_apps(self):
-        self.after(0, self._log, "Listing installed packages...")
-        out, _, _ = run(f"adb -s {self._device} shell pm list packages -3 2>/dev/null")
-        if out:
-            pkgs = [l.replace('package:', '') for l in out.split('\n') if l.strip()]
-            self.after(0, self._log, f"Found {len(pkgs)} third-party apps:")
-            for p in pkgs[:30]:
-                self.after(0, self._log, f"  {p}")
-        else:
-            self.after(0, self._log, "No packages found or permission denied")
-
-    def _install_adb(self):
-        install_adb(self, on_done=lambda: self.after(500,
-            threading.Thread(target=self._detect_device, daemon=True).start))
+            self._log("No device connected."); return
+        def _do():
+            out, _, _ = _r(f"adb -s {self._device} shell pm list packages -3 2>/dev/null")
+            pkgs = [l.replace('package:','') for l in out.split('\n') if l.strip()]
+            self._log(f"Installed apps ({len(pkgs)}):")
+            for p in pkgs[:25]: self._log(f"  {p}")
+        threading.Thread(target=_do, daemon=True).start()

@@ -7,17 +7,8 @@ import json
 import threading
 import time
 
-C = {
-    'bg':  '#020c14', 'sf':  '#061523', 's2':  '#0a1e2e',
-    'br':  '#0d2a3d', 'br2': '#1a3a52', 'ac':  '#00ffe0',
-    'wn':  '#ff4c4c', 'am':  '#ffb830', 'ok':  '#39ff88',
-    'bl':  '#4d9fff', 'pu':  '#c084fc', 'tx':  '#c8e8f4',
-    'mu':  '#3a6278', 'mu2': '#5a8298',
-}
-
-MONO    = ('Courier', 10)
-MONO_SM = ('Courier', 9)
-MONO_LG = ('Courier', 13, 'bold')
+# Import colours and fonts from widgets (single source of truth)
+from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 MONO_XL = ('Courier', 36, 'bold')
 
 
