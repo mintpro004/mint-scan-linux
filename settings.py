@@ -8,7 +8,7 @@ import widgets as _widgets
 SETTINGS_FILE = os.path.expanduser('~/.mint_scan_settings.json')
 
 DEFAULTS = {
-    'font_size':     10,
+    'font_size':     11,
     'ui_scale':      1.0,
     'theme':         'dark',
     'accent_color':  '#00ffe0',
@@ -299,7 +299,7 @@ class SettingsScreen(ctk.CTkFrame):
         self.font_lbl.configure(text=f"{size}px")
         self.prev_title.configure(font=('Courier', size+4, 'bold'))
         self.prev_body.configure(font=('Courier', size))
-        self.prev_sub.configure(font=('Courier', max(7, size-1)))
+        self.prev_sub.configure(font=('Courier', max(8, size-1)))
 
     def _on_scale_change(self, val):
         self.scale_lbl.configure(text=f"{int(float(val)*100)}%")

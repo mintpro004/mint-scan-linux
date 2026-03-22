@@ -52,10 +52,10 @@ class NetScanScreen(ctk.CTkFrame):
                                         font=MONO_SM, text_color=C['mu'])
         self.cap_status.pack(anchor='w', padx=12, pady=(8,4))
         self.traffic_log = ctk.CTkTextbox(self.traffic_card, height=160,
-                                           font=('Courier',8), fg_color=C['bg'],
+                                           font=('Courier',10), fg_color=C['bg'],
                                            text_color=C['ac'], border_width=0)
         self.traffic_log.pack(fill='x', padx=8, pady=(0,8))
-        self.traffic_log.configure(state='disabled')
+        self.traffic_log.configure(state='normal')
 
         # Vulnerabilities
         SectionHeader(body, '03', 'VULNERABILITIES').pack(fill='x', padx=14, pady=(10,4))
@@ -204,10 +204,8 @@ class NetScanScreen(ctk.CTkFrame):
                 text="● CAPTURE STOPPED", text_color=C['mu']))
 
     def _log_traffic(self, msg):
-        self.traffic_log.configure(state='normal')
         self.traffic_log.insert('end', msg + '\n')
         self.traffic_log.see('end')
-        self.traffic_log.configure(state='disabled')
 
     def _vuln_scan(self):
         for w in self.vuln_frame.winfo_children(): w.destroy()

@@ -58,11 +58,11 @@ class SysFixScreen(ctk.CTkFrame):
         SectionHeader(body, '02', 'SCAN OUTPUT').pack(fill='x', padx=14, pady=(10,4))
         log_card = Card(body)
         log_card.pack(fill='x', padx=14, pady=(0,8))
-        self.scan_log = ctk.CTkTextbox(log_card, height=200, font=('Courier',9),
+        self.scan_log = ctk.CTkTextbox(log_card, height=200, font=('Courier',10),
                                         fg_color=C['bg'], text_color=C['ok'],
                                         border_width=0)
         self.scan_log.pack(fill='x', padx=8, pady=8)
-        self.scan_log.configure(state='disabled')
+        self.scan_log.configure(state='normal')
 
         # Results
         SectionHeader(body, '03', 'FINDINGS & FIXES').pack(fill='x', padx=14, pady=(10,4))
@@ -70,16 +70,12 @@ class SysFixScreen(ctk.CTkFrame):
         self.results_frame.pack(fill='x', padx=14, pady=(0,14))
 
     def _log(self, msg):
-        self.scan_log.configure(state='normal')
         self.scan_log.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
         self.scan_log.see('end')
-        self.scan_log.configure(state='disabled')
 
     def _full_scan(self):
         for w in self.results_frame.winfo_children(): w.destroy()
-        self.scan_log.configure(state='normal')
         self.scan_log.delete('1.0', 'end')
-        self.scan_log.configure(state='disabled')
         threading.Thread(target=self._do_full_scan, daemon=True).start()
 
     def _do_full_scan(self):

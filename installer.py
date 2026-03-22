@@ -5,7 +5,7 @@ No external terminal needed — works on Chromebook, Ubuntu, Kali, WSL, macOS.
 """
 import tkinter as tk
 import customtkinter as ctk
-import subprocess, threading, time, os, sys
+import subprocess, threading, time, os, sys, shutil
 from widgets import C, MONO_SM, Btn
 
 
@@ -57,13 +57,14 @@ class InstallerPopup(ctk.CTkToplevel):
         self._prog.configure(mode='indeterminate')
 
         # Log area
-        self._log = ctk.CTkTextbox(self, font=('Courier', 9),
+        self._log = ctk.CTkTextbox(self, font=('Courier', 10),
                                     fg_color=C['s2'],
                                     text_color=C['ok'],
                                     border_color=C['br'], border_width=1,
                                     corner_radius=0)
         self._log.pack(fill='both', expand=True, padx=0, pady=0)
-        self._log.configure(state='disabled')
+        # Keep it normal state so user can select/copy
+        self._log.configure(state='normal')
 
         # Bottom bar
         bot = ctk.CTkFrame(self, fg_color=C['sf'], height=44, corner_radius=0)
@@ -85,10 +86,8 @@ class InstallerPopup(ctk.CTkToplevel):
     def _log_line(self, msg, color=None):
         """Thread-safe log append"""
         def _do():
-            self._log.configure(state='normal')
             self._log.insert('end', msg + '\n')
             self._log.see('end')
-            self._log.configure(state='disabled')
         self.after(0, _do)
 
     def _set_title(self, msg):

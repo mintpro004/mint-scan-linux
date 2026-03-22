@@ -184,12 +184,12 @@ class UsbScreen(ctk.CTkFrame):
 
         # ── 06 Output log ─────────────────────────────────────
         SectionHeader(body,'06','OUTPUT').pack(fill='x', padx=14, pady=(10,4))
-        self.output = ctk.CTkTextbox(body, height=160, font=('Courier',8),
+        self.output = ctk.CTkTextbox(body, height=160, font=('Courier',10),
                                       fg_color=C['s2'], text_color=C['ok'],
                                       border_color=C['br'], border_width=1,
                                       corner_radius=6)
         self.output.pack(fill='x', padx=14, pady=(0,14))
-        self.output.configure(state='disabled')
+        self.output.configure(state='normal')
 
         # Update ADB status on build
         threading.Thread(target=self._check_adb_status, daemon=True).start()
@@ -198,10 +198,8 @@ class UsbScreen(ctk.CTkFrame):
 
     def _log(self, msg):
         def _do():
-            self.output.configure(state='normal')
             self.output.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
             self.output.see('end')
-            self.output.configure(state='disabled')
         self.after(0, _do)
 
     # ── ADB check ─────────────────────────────────────────────

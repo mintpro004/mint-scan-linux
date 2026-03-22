@@ -119,27 +119,25 @@ class FirewallScreen(ctk.CTkFrame):
         ipt_card.pack(fill='x', padx=14, pady=(0,8))
         Btn(ipt_card, "VIEW IPTABLES", command=self._view_iptables,
             variant='ghost', width=150).pack(anchor='w', padx=12, pady=(8,4))
-        self.ipt_box = ctk.CTkTextbox(ipt_card, height=140, font=('Courier',8),
+        self.ipt_box = ctk.CTkTextbox(ipt_card, height=140, font=('Courier',10),
                                        fg_color=C['bg'], text_color=C['mu'],
                                        border_width=0)
         self.ipt_box.pack(fill='x', padx=8, pady=(0,8))
-        self.ipt_box.configure(state='disabled')
+        self.ipt_box.configure(state='normal')
 
         # ── Action output ─────────────────────────────────────
         SectionHeader(body, '06', 'ACTION OUTPUT').pack(fill='x', padx=14, pady=(8,4))
-        self.action_log = ctk.CTkTextbox(body, height=110, font=('Courier',8),
+        self.action_log = ctk.CTkTextbox(body, height=110, font=('Courier',10),
                                           fg_color=C['s2'], text_color=C['ok'],
                                           border_color=C['br'], border_width=1, corner_radius=6)
         self.action_log.pack(fill='x', padx=14, pady=(0,14))
-        self.action_log.configure(state='disabled')
+        self.action_log.configure(state='normal')
 
     # ── Logging ───────────────────────────────────────────────
 
     def _alog(self, msg):
-        self.action_log.configure(state='normal')
         self.action_log.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
         self.action_log.see('end')
-        self.action_log.configure(state='disabled')
 
     # ── Status loader ─────────────────────────────────────────
 
@@ -378,8 +376,6 @@ class FirewallScreen(ctk.CTkFrame):
             out, err, rc = _run("sudo iptables -L -n --line-numbers 2>/dev/null", timeout=8)
             if rc != 0 or not out:
                 out = err or "iptables not available or needs sudo"
-            self.ipt_box.configure(state='normal')
             self.ipt_box.delete('1.0', 'end')
             self.ipt_box.insert('1.0', out)
-            self.ipt_box.configure(state='disabled')
         threading.Thread(target=_do, daemon=True).start()

@@ -23,10 +23,10 @@ LIGHT_THEME = {
 }
 
 C = dict(DARK_THEME)
-MONO    = ('Courier', 10)
-MONO_SM = ('Courier', 9)
-MONO_LG = ('Courier', 13, 'bold')
-MONO_XL = ('Courier', 36, 'bold')
+MONO    = ('Courier', 11)
+MONO_SM = ('Courier', 10)
+MONO_LG = ('Courier', 14, 'bold')
+MONO_XL = ('Courier', 40, 'bold')
 _current_theme = 'dark'
 
 
@@ -34,7 +34,7 @@ def get_theme():
     return _current_theme
 
 
-def apply_theme(name, accent=None, font_size=10):
+def apply_theme(name, accent=None, font_size=11):
     global _current_theme, MONO, MONO_SM, MONO_LG, MONO_XL
     _current_theme = name
     
@@ -47,9 +47,9 @@ def apply_theme(name, accent=None, font_size=10):
     # Update font constants
     fs = font_size
     MONO    = ('Courier', fs)
-    MONO_SM = ('Courier', max(7, fs - 1))
+    MONO_SM = ('Courier', max(8, fs - 1))
     MONO_LG = ('Courier', fs + 3, 'bold')
-    MONO_XL = ('Courier', fs + 26, 'bold')
+    MONO_XL = ('Courier', fs + 29, 'bold')
     
     try:
         ctk.set_appearance_mode('light' if name == 'light' else 'dark')
@@ -67,13 +67,13 @@ def load_theme_settings():
                 s = json.load(f)
                 theme = s.get('theme', 'dark')
                 accent = s.get('accent_color', None)
-                font_size = s.get('font_size', 10)
+                font_size = s.get('font_size', 11)
                 scale = s.get('ui_scale', 1.0)
                 apply_theme(theme, accent, font_size)
                 return scale
     except Exception:
         pass
-    apply_theme('dark')
+    apply_theme('dark', font_size=11)
     return 1.0
 
 

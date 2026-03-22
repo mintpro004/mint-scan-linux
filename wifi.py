@@ -137,7 +137,7 @@ class WifiScreen(ctk.CTkFrame):
         if not self._scanning: return
 
         # Saved networks
-        saved_out, _, _ = run("nmcli -t -f NAME,TYPE,TIMESTAMP-REAL connection show 2>/dev/null | grep '802-11-wireless' | head -30", timeout=8)
+        saved_out, _, _ = run("nmcli -t -f NAME,TYPE,TIMESTAMP-REAL connection show 2>/dev/null | grep -E '802-11-wireless|ethernet' | sort -t: -k3 -nr", timeout=8)
         saved = []
         for line in saved_out.split('\n'):
             parts = line.split(':')
