@@ -3,14 +3,7 @@ import tkinter as tk
 import customtkinter as ctk
 import threading, subprocess, re, os
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-
-
-def run(cmd, timeout=15):
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
-    except Exception as e:
-        return '', str(e), 1
+from utils import run_cmd as run, get_wifi_networks, get_current_wifi
 
 
 def sig_color(sig):
@@ -48,11 +41,17 @@ class WifiScreen(ctk.CTkFrame):
                      text_color=C['ac']).pack(side='left', padx=16)
         self.status_lbl = ctk.CTkLabel(hdr, text="Idle", font=MONO_SM, text_color=C['mu'])
         self.status_lbl.pack(side='left', padx=8)
-        self.stop_btn = Btn(hdr, "⏹ STOP", command=self._stop_scan, variant='danger', width=90)
-        self.stop_btn.pack(side='right', padx=4, pady=6)
+        
+        btn_row = ctk.CTkFrame(hdr, fg_color='transparent')
+        btn_row.pack(side='right', padx=12, pady=6)
+        
+        Btn(btn_row, "🚀 SPEED TEST", command=lambda: self.app._switch_tab('network'), 
+            variant='blue', width=120).pack(side='left', padx=4)
+        self.stop_btn = Btn(btn_row, "⏹ STOP", command=self._stop_scan, variant='danger', width=90)
+        self.stop_btn.pack(side='left', padx=4)
         self.stop_btn.configure(state='disabled')
-        self.scan_btn = Btn(hdr, "▶ SCAN", command=self._start_scan, width=90)
-        self.scan_btn.pack(side='right', padx=4, pady=6)
+        self.scan_btn = Btn(btn_row, "▶ SCAN", command=self._start_scan, width=90)
+        self.scan_btn.pack(side='left', padx=4)
 
         self.scroll = ScrollableFrame(self)
         self.scroll.pack(fill='both', expand=True)
@@ -87,7 +86,7 @@ class WifiScreen(ctk.CTkFrame):
     def _load_current(self):
         out, _, _    = run("nmcli -t -f TYPE,STATE dev 2>/dev/null | head -3")
         ip_out, _, _ = run("ip route get 8.8.8.8 2>/dev/null | grep src | awk '{print $7}' | head -1")
-        ssid_out,_,_ = run("nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | cut -d: -f2 | head -1")
+        ssid_out = get_current_wifi()
         conn_type    = 'Wi-Fi' if 'wifi' in out.lower() else 'Ethernet' if 'ethernet' in out.lower() else 'Unknown'
         connected    = 'connected' in out.lower()
         self.after(0, self._render_current, conn_type, ssid_out, ip_out, connected)
@@ -149,27 +148,8 @@ class WifiScreen(ctk.CTkFrame):
 
         # Rescan and list
         run("nmcli device wifi rescan 2>/dev/null", timeout=5)
-        out, _, rc = run("nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null", timeout=15)
-        networks, seen = [], set()
-        if rc == 0 and out:
-            for line in out.strip().split('\n'):
-                if not line.strip(): continue
-                parts = line.split(':')
-                if len(parts) < 4: continue
-                ssid = parts[0] or '(hidden)'
-                bssid = parts[1] if len(parts) > 1 else '—'
-                try:    signal = int(parts[2]) if len(parts) > 2 else 0
-                except: signal = 0
-                security = parts[3] if len(parts) > 3 else '—'
-                channel  = parts[4] if len(parts) > 4 else '—'
-                freq     = parts[5] if len(parts) > 5 else '—'
-                key = ssid + bssid
-                if key not in seen:
-                    seen.add(key)
-                    networks.append({'ssid':ssid,'bssid':bssid,'signal':signal,
-                                     'security': 'OPEN' if not security or security=='--' else security,
-                                     'channel':channel,'freq':freq})
-        networks.sort(key=lambda x: -x['signal'])
+        networks = get_wifi_networks()
+        
         self.after(0, self._render_networks, networks)
         self._scanning = False
         self.after(0, lambda: (
@@ -226,6 +206,7 @@ class WifiScreen(ctk.CTkFrame):
         popup.title(f"Password: {name}")
         popup.geometry("420x160")
         popup.configure(fg_color=C['bg'])
+        popup.attributes('-topmost', True)
         if rc == 0 and out.strip():
             ctk.CTkLabel(popup, text=name, font=('Courier',12,'bold'),
                          text_color=C['ac']).pack(pady=(12,4))
@@ -235,8 +216,8 @@ class WifiScreen(ctk.CTkFrame):
             e.insert(0, out.strip())
         else:
             ctk.CTkLabel(popup,
-                text=f"Cannot read: {name}\n\nRun with sudo for password access:\n  sudo python3 main.py",
-                font=MONO_SM, text_color=C['mu'], justify='center').pack(expand=True)
+                text=f"Cannot read: {name}\n\nMake sure to ALLOW the pkexec prompt.",
+                font=MONO_SM, text_color=C['mu'], justify='center').pack(expand=True, pady=10)
         Btn(popup, "CLOSE", command=popup.destroy, variant='ghost').pack(pady=4)
 
     def _render_networks(self, networks):

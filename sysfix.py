@@ -5,6 +5,7 @@ import threading, subprocess, os, re, time
 from installer import install_all_tools
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from utils import run_cmd as run
+from reports import prompt_save_report
 
 
 class SysFixScreen(ctk.CTkFrame):
@@ -194,6 +195,18 @@ class SysFixScreen(ctk.CTkFrame):
                     command=lambda c=fix_cmd, t=title: self._run_fix(c, t),
                     variant='success', width=120
                     ).pack(anchor='e', padx=10, pady=(0,8))
+
+        if findings:
+            Btn(self.results_frame, "💾 EXPORT SYSTEM REPORT",
+                command=lambda: self._export_report(findings),
+                variant='success', width=260).pack(pady=15)
+
+    def _export_report(self, findings):
+        sections = [
+            ("SYSTEM SCAN FINDINGS", [f"[{f[0]}] {f[1]}" for f in findings], "WARN"),
+            ("SUGGESTED REMEDIATIONS", [f[3] for f in findings if len(f)>3], "INFO")
+        ]
+        prompt_save_report(self, "Local System", "System Health Audit", sections)
 
     def _run_fix(self, cmd, title):
         self._log(f"Running fix: {title}")

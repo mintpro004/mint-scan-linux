@@ -5,6 +5,7 @@ import threading, subprocess, re, time, os
 from installer import install_nmap
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from utils import run_cmd as run
+from reports import prompt_save_report
 
 
 class NetScanScreen(ctk.CTkFrame):
@@ -309,6 +310,20 @@ class NetScanScreen(ctk.CTkFrame):
                     command=lambda f=fix: self._copy(f),
                     variant='ghost', width=60
                     ).pack(side='right', padx=8)
+
+        # Global export button
+        Btn(self.fix_frame, "💾 EXPORT SECURITY REPORT",
+            command=lambda: self._export_report(vulns, fixes),
+            variant='success', width=260).pack(pady=10)
+
+    def _export_report(self, vulns, fixes):
+        ip_out, _, _ = run("ip route | grep default | awk '{print $3}'")
+        gateway = ip_out.strip() or "Network"
+        sections = [
+            ("VULNERABILITIES FOUND", [f"[{v[0]}] {v[1]} - {v[2]}" for v in vulns], "WARN"),
+            ("RECOMMENDED FIXES", fixes, "INFO")
+        ]
+        prompt_save_report(self, gateway, "Network Security Audit", sections)
 
     def _copy(self, text):
         try:

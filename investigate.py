@@ -8,6 +8,7 @@ import customtkinter as ctk
 import subprocess, threading, re, time, os, json
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from utils import run_cmd as _run
+from reports import prompt_save_report
 
 
 def _is_private_ip(ip):
@@ -613,11 +614,30 @@ class InvestigateScreen(ctk.CTkFrame):
                 Btn(act_row, "📋 COPY IP",
                     command=lambda ip=target: self._copy(ip),
                     variant='ghost', width=100).pack(side='left', padx=4)
+
+            Btn(act_row, "💾 EXPORT REPORT",
+                command=lambda: self._export_report(target, findings, geo_data, net_data, analysis),
+                variant='success', width=160).pack(side='left', padx=4)
+
             Btn(act_row, "⚙ OPEN FIREWALL",
                 command=lambda: self.app._switch_tab('firewall'),
                 variant='blue', width=140).pack(side='left', padx=4)
 
-        # Geolocation
+    def _export_report(self, target, findings, geo, net, analysis):
+        sections = [
+            ("INVESTIGATION SUMMARY", f"Target: {target}\nRisk: {next((a['risk'] for a in analysis if a['type']=='summary'), 'Unknown')}", "INFO"),
+            ("FINDINGS", findings, "WARN"),
+        ]
+        if geo: sections.append(("GEOLOCATION", geo, "INFO"))
+        if net: sections.append(("NETWORK INTEL", net, "INFO"))
+        
+        recs = next((a['items'] for a in analysis if a['type']=='recommendations'), [])
+        if recs: sections.append(("RECOMMENDATIONS", recs, "INFO"))
+        
+        prompt_save_report(self, target, "Threat Investigation", sections)
+
+    # ── Geolocation ───────────────────────────────────────────
+
         for w in self.geo_frame.winfo_children():
             w.destroy()
         if geo_data:
