@@ -7,14 +7,7 @@ import tkinter as tk
 import customtkinter as ctk
 import subprocess, threading, re, time, os, json
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-
-
-def _run(cmd, timeout=15):
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
-    except Exception as e:
-        return '', str(e), 1
+from utils import run_cmd as _run
 
 
 def _is_private_ip(ip):
@@ -164,11 +157,13 @@ class InvestigateScreen(ctk.CTkFrame):
     # ── Quick investigation launchers ─────────────────────────
 
     def _investigate_public_ip(self):
-        ip, _, _ = _run("curl -s --max-time 5 https://api.ipify.org 2>/dev/null")
-        if ip:
-            self.target_entry.delete(0, 'end')
-            self.target_entry.insert(0, ip.strip())
-            self._start_investigation()
+        def _do():
+            ip, _, _ = _run("curl -s --max-time 5 https://api.ipify.org 2>/dev/null")
+            if ip:
+                self.after(0, lambda: self.target_entry.delete(0, 'end'))
+                self.after(0, lambda: self.target_entry.insert(0, ip.strip()))
+                self.after(0, self._start_investigation)
+        threading.Thread(target=_do, daemon=True).start()
 
     def _investigate_connections(self):
         self.target_entry.delete(0, 'end')

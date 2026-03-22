@@ -4,14 +4,7 @@ import customtkinter as ctk
 import threading, subprocess, re, time, os
 from installer import install_nmap
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-
-
-def run(cmd, timeout=15):
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
-    except Exception as e:
-        return '', str(e), 1
+from utils import run_cmd as run
 
 
 class NetScanScreen(ctk.CTkFrame):

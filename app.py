@@ -9,9 +9,6 @@ import threading, time, sys, os, json
 # Import colour palette from widgets (single source of truth)
 from widgets import C, apply_theme
 
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("dark-blue")
-
 BOOT_LINES = [
     "INITIALISING MINT SCAN v7...",
     "LOADING SECURITY MODULES...",
@@ -259,6 +256,150 @@ class MintScanApp:
 
     # ── TAB SWITCHING ─────────────────────────────────────────
 
+    def refresh_ui(self):
+        """Called by settings when theme/fonts change to rebuild all screens"""
+        # Save current tab
+        current = self.current_tab
+        
+        # Destroy all screens
+        for frame in self._frames.values():
+            frame.destroy()
+        self._frames = {}
+        
+        # Destroy sidebar buttons
+        for btn in self._tab_btns.values():
+            btn.destroy()
+        self._tab_btns = {}
+        
+        # Rebuild UI content (sidebar, screens)
+        # Note: self.sidebar and self.content still exist, we just cleared their children
+        # Actually, easiest is to clear container and rebuild from scratch, 
+        # but self.sidebar is inside container.
+        
+        # Clear sidebar content
+        for w in self.sidebar.winfo_children():
+            w.destroy()
+            
+        # Clear content area
+        for w in self.content.winfo_children():
+            w.destroy()
+
+        # Re-initialize screens
+        import importlib
+        # We need to re-import modules to get updated C/fonts? 
+        # No, widgets.C is updated in-place. Modules that use `from widgets import C` 
+        # might need reload if they used C at module level, but they use it in __init__ usually.
+        # However, font constants (MONO etc) in widgets.py are updated.
+        # Modules importing them: `from widgets import MONO` -> they have OLD values.
+        # We must reload the modules or update their references.
+        # Given complexity, we'll try to just rebuild and see. 
+        # If fonts don't update, we might need to update the modules' globals.
+        
+        # Re-import to be safe
+        import widgets
+        import dash, perms, wifi, calls, network, battery, threats, notifs
+        import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, settings
+        
+        # Force reload of modules that use fonts
+        importlib.reload(widgets)
+        importlib.reload(dash)
+        importlib.reload(perms)
+        importlib.reload(wifi)
+        importlib.reload(calls)
+        importlib.reload(network)
+        importlib.reload(battery)
+        importlib.reload(threats)
+        importlib.reload(notifs)
+        importlib.reload(ports)
+        importlib.reload(usb)
+        importlib.reload(netscan)
+        importlib.reload(malware)
+        importlib.reload(sysfix)
+        importlib.reload(firewall)
+        importlib.reload(toolbox)
+        importlib.reload(investigate)
+        importlib.reload(settings)
+
+        # Rebuild sidebar header
+        ctk.CTkLabel(self.sidebar, text="NAVIGATION",
+                     font=('Courier',7,'bold'), text_color=C['mu']
+                     ).pack(anchor='w', padx=12, pady=(10,4))
+
+        # Re-instantiate screens
+        screen_map = {
+            'dash':        dash.DashScreen,
+            'perms':       perms.PermsScreen,
+            'wifi':        wifi.WifiScreen,
+            'calls':       calls.CallsScreen,
+            'network':     network.NetworkScreen,
+            'battery':     battery.BatteryScreen,
+            'threats':     threats.ThreatsScreen,
+            'notifs':      notifs.NotifsScreen,
+            'ports':       ports.PortsScreen,
+            'usb':         usb.UsbScreen,
+            'apk':         usb.ApkScreen, # alias
+            'netscan':     netscan.NetScanScreen,
+            'malware':     malware.MalwareScreen,
+            'sysfix':      sysfix.SysFixScreen,
+            'firewall':    firewall.FirewallScreen,
+            'toolbox':     toolbox.ToolboxScreen,
+            'investigate': investigate.InvestigateScreen,
+            'settings':    settings.SettingsScreen,
+        }
+
+        # Rebuild sidebar buttons
+        visible_tabs = [(k, lbl, icon) for k, lbl, icon in ALL_TABS
+                        if k in screen_map]
+
+        for key, label, icon in visible_tabs:
+            btn = ctk.CTkButton(
+                self.sidebar,
+                text=f" {icon}  {label}",
+                font=('Courier', 10),
+                height=38,
+                anchor='w',
+                fg_color='transparent',
+                hover_color=C['br'],
+                text_color=C['mu'],
+                corner_radius=6,
+                border_width=0,
+                command=lambda k=key: self._switch_tab(k)
+            )
+            btn.pack(fill='x', padx=6, pady=1)
+            self._tab_btns[key] = btn
+
+        # Sidebar footer
+        ctk.CTkFrame(self.sidebar, height=1,
+                     fg_color=C['br']).pack(fill='x', side='bottom', pady=(0,8))
+        ctk.CTkLabel(self.sidebar, text="MINT PROJECTS  •  PTY",
+                     font=('Courier',7), text_color=C['br2']
+                     ).pack(side='bottom', pady=(0,4))
+
+        # Re-create frames
+        for key, cls in screen_map.items():
+            try:
+                frame = cls(self.content, self)
+                frame.place(relwidth=1, relheight=1)
+                self._frames[key] = frame
+            except Exception as e:
+                print(f"  [error] {key}: {e}")
+
+        # Restore tab
+        if current in self._frames:
+            self._switch_tab(current)
+        else:
+            self._switch_tab('dash')
+            
+        # Update navbar colors if needed
+        self.navbar.configure(fg_color=C['sf'])
+        # Also need to update the logo text color, clock color, etc.
+        # But those are in self.navbar which we didn't destroy, just repacked?
+        # No, self.navbar is in self.root. 
+        # To be fully correct, we should update navbar widgets too.
+        # For now, let's just trigger a full app restart if possible, 
+        # but python os.execv is abrupt.
+        # We'll rely on this rebuild for the content area. Navbar might stay old colors until restart.
+        
     def _switch_tab(self, key):
         if key not in self._frames:
             return

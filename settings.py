@@ -335,6 +335,12 @@ class SettingsScreen(ctk.CTkFrame):
                 ctk.set_widget_scaling(self.settings['ui_scale'])
             except Exception:
                 pass
+            
+            # Rebuild entire UI to apply fonts/colors to all screens
+            if hasattr(self.app, 'refresh_ui'):
+                self.app.refresh_ui()
+                return # Stop here since this frame is destroyed
+
             self.status_lbl.configure(
                 text="✓ Settings saved. Some changes applied immediately, others need restart.",
                 text_color=_widgets.C['ok'])

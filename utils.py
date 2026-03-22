@@ -12,7 +12,13 @@ from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 
 
 def run_cmd(cmd, timeout=8):
-    """Run a shell command safely, return (stdout, stderr, returncode)."""
+    """Run a shell command safely, using pkexec for sudo if needed."""
+    # Handle sudo via pkexec for GUI apps
+    if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
+        inner = cmd.strip()[5:]
+        inner_quoted = inner.replace("'", "'\\''")
+        cmd = f"pkexec bash -c '{inner_quoted}'"
+
     try:
         r = subprocess.run(
             cmd, shell=True, capture_output=True, text=True, timeout=timeout

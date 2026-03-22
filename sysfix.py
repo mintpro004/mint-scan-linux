@@ -4,14 +4,7 @@ import customtkinter as ctk
 import threading, subprocess, os, re, time
 from installer import install_all_tools
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-
-
-def run(cmd, timeout=20):
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
-    except Exception as e:
-        return '', str(e), 1
+from utils import run_cmd as run
 
 
 class SysFixScreen(ctk.CTkFrame):

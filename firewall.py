@@ -4,14 +4,7 @@ import customtkinter as ctk
 import threading, subprocess, re, time, shutil
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from installer import InstallerPopup
-
-
-def _run(cmd, timeout=12):
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
-    except Exception as e:
-        return '', str(e), 1
+from utils import run_cmd as _run
 
 
 class FirewallScreen(ctk.CTkFrame):

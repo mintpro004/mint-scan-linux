@@ -7,13 +7,7 @@ import customtkinter as ctk
 import threading, subprocess, os, re, time, shutil
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from installer import install_adb
-
-def _r(cmd, timeout=20):
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
-    except Exception as e:
-        return '', str(e), 1
+from utils import run_cmd as _r
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 COMPANION_HTML = os.path.join(BASE, 'companion_app.html')

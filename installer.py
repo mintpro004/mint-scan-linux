@@ -144,6 +144,13 @@ class InstallerPopup(ctk.CTkToplevel):
 
     def _run_cmd(self, cmd):
         """Run a single command and stream output to log"""
+        # Replace sudo with pkexec for GUI prompt if not running as root
+        if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
+            inner = cmd.strip()[5:]
+            # Safe quoting for bash -c
+            inner_quoted = inner.replace("'", "'\\''")
+            cmd = f"pkexec bash -c '{inner_quoted}'"
+
         try:
             proc = subprocess.Popen(
                 cmd, shell=True,

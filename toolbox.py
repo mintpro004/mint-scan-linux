@@ -6,14 +6,7 @@ import customtkinter as ctk
 import subprocess, threading, shutil, time, os
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from installer import InstallerPopup
-
-
-def _run(cmd, timeout=8):
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
-    except Exception as e:
-        return '', str(e), 1
+from utils import run_cmd as _run
 
 
 # ── Tool definitions ──────────────────────────────────────────────
