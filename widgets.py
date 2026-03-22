@@ -87,12 +87,12 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
     Mouse wheel and touchpad two-finger scroll both work.
     """
     def __init__(self, parent, fg_color=None, **kwargs):
+        kwargs.setdefault('scrollbar_button_color', C['br2'])
+        kwargs.setdefault('scrollbar_button_hover_color', C['ac'])
+        kwargs.setdefault('corner_radius', 0)
         super().__init__(
             parent,
             fg_color=fg_color or C['bg'],
-            scrollbar_button_color=C['br2'],
-            scrollbar_button_hover_color=C['ac'],
-            corner_radius=0,
             **kwargs
         )
         # Bind mouse wheel when mouse enters this frame
