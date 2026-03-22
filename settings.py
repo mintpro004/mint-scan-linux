@@ -278,17 +278,20 @@ class SettingsScreen(ctk.CTkFrame):
         self._theme_var.set(theme_name)
         self._update_theme_buttons(theme_name)
         # Apply immediately for preview
-        _widgets.apply_theme(theme_name)
+        acc = self._accent_var.get() if hasattr(self, '_accent_var') else '#00ffe0'
+        fs = int(self.font_slider.get()) if hasattr(self, 'font_slider') else 10
+        _widgets.apply_theme(theme_name, accent=acc, font_size=fs)
         self._theme_status.configure(
             text=f"Current: {'DARK 🌙' if theme_name=='dark' else 'LIGHT ☀'} theme — tap SAVE to keep")
         self.status_lbl.configure(
             text=f"Theme changed to {theme_name.upper()} — tap SAVE to save",
-            text_color=C['ok'])
+            text_color=_widgets.C['ok'])
 
     def _update_theme_buttons(self, theme):
         try:
+            acc = self._accent_var.get() if hasattr(self, '_accent_var') else '#00ffe0'
             if theme == 'dark':
-                self._dark_btn.configure(border_width=3, border_color='#00ffe0')
+                self._dark_btn.configure(border_width=3, border_color=acc)
                 self._light_btn.configure(border_width=1, border_color='#94a3b8')
             else:
                 self._dark_btn.configure(border_width=1, border_color='#1a3a52')
@@ -306,6 +309,10 @@ class SettingsScreen(ctk.CTkFrame):
         self.status_lbl.configure(
             text=f"Accent set to {colour} — tap SAVE",
             text_color=colour)
+        # Update theme buttons to show new accent
+        self._update_theme_buttons(self._theme_var.get())
+        # Apply to live dict
+        _widgets.C['ac'] = colour
 
     def _save(self):
         self.settings = {
@@ -318,17 +325,22 @@ class SettingsScreen(ctk.CTkFrame):
             'show_clock':    True,
         }
         if save_settings(self.settings):
-            # Apply scale immediately
+            # Apply immediately
+            _widgets.apply_theme(
+                self.settings['theme'], 
+                self.settings['accent_color'], 
+                self.settings['font_size']
+            )
             try:
                 ctk.set_widget_scaling(self.settings['ui_scale'])
             except Exception:
                 pass
             self.status_lbl.configure(
-                text="✓ Settings saved. Restart Mint Scan to apply all changes.",
-                text_color=C['ok'])
+                text="✓ Settings saved. Some changes applied immediately, others need restart.",
+                text_color=_widgets.C['ok'])
         else:
             self.status_lbl.configure(
-                text="✗ Could not save settings", text_color=C['wn'])
+                text="✗ Could not save settings", text_color=_widgets.C['wn'])
 
     def _reset(self):
         self.settings = dict(DEFAULTS)

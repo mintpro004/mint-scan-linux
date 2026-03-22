@@ -1,7 +1,7 @@
 """Firewall Manager — view all rules, add/remove, configure UFW"""
 import tkinter as tk
 import customtkinter as ctk
-import threading, subprocess, re, time
+import threading, subprocess, re, time, shutil
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from installer import InstallerPopup
 
@@ -160,6 +160,16 @@ class FirewallScreen(ctk.CTkFrame):
         for w in self.status_card.winfo_children():
             w.destroy()
 
+        # Check if ufw is installed
+        if not shutil.which('ufw'):
+            ResultBox(self.status_card, 'warn', '🔥 UFW Firewall Not Installed',
+                      'The "Uncomplicated Firewall" tool is missing from your system.'
+                      ).pack(fill='x', padx=8, pady=(8,4))
+            Btn(self.status_card, "⬇ INSTALL UFW FIREWALL",
+                command=self._install_ufw, variant='primary', width=240
+                ).pack(anchor='w', padx=12, pady=(0,10))
+            return
+
         col = C['ok'] if active else C['wn']
         status_text = 'ACTIVE' if active else 'INACTIVE'
 
@@ -182,6 +192,24 @@ class FirewallScreen(ctk.CTkFrame):
                 ('STATUS',    'ACTIVE',  C['ok']),
                 ('TOOL',      'UFW',     C['ac']),
             ], columns=4).pack(fill='x', padx=8, pady=(4,8))
+
+    def _install_ufw(self):
+        self._alog("Installing UFW Firewall...")
+        InstallerPopup(self,
+            title="Install UFW Firewall",
+            commands=[
+                'echo "iptables-persistent iptables-persistent/autosave_v4 boolean true" | sudo debconf-set-selections',
+                'echo "iptables-persistent iptables-persistent/autosave_v6 boolean true" | sudo debconf-set-selections',
+                'sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq',
+                'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ufw iptables-persistent',
+                'sudo ufw --force enable',
+                'sudo ufw default deny incoming',
+                'sudo ufw default allow outgoing',
+                'sudo ufw allow ssh',
+            ],
+            success_msg="UFW Firewall installed and enabled!",
+            on_done=lambda: threading.Thread(target=self._load_status, daemon=True).start()
+        )
 
     def _render_rules(self, ufw_out):
         for w in self.rules_frame.winfo_children():

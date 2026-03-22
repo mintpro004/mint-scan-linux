@@ -34,14 +34,47 @@ def get_theme():
     return _current_theme
 
 
-def apply_theme(name):
-    global _current_theme
+def apply_theme(name, accent=None, font_size=10):
+    global _current_theme, MONO, MONO_SM, MONO_LG, MONO_XL
     _current_theme = name
-    C.update(LIGHT_THEME if name == 'light' else DARK_THEME)
+    
+    # Update color dictionary
+    base_colors = LIGHT_THEME if name == 'light' else DARK_THEME
+    C.update(base_colors)
+    if accent:
+        C['ac'] = accent
+        
+    # Update font constants
+    fs = font_size
+    MONO    = ('Courier', fs)
+    MONO_SM = ('Courier', max(7, fs - 1))
+    MONO_LG = ('Courier', fs + 3, 'bold')
+    MONO_XL = ('Courier', fs + 26, 'bold')
+    
     try:
         ctk.set_appearance_mode('light' if name == 'light' else 'dark')
     except Exception:
         pass
+
+
+def load_theme_settings():
+    """Helper to load and apply all settings at once"""
+    import json, os
+    settings_file = os.path.expanduser('~/.mint_scan_settings.json')
+    try:
+        if os.path.exists(settings_file):
+            with open(settings_file) as f:
+                s = json.load(f)
+                theme = s.get('theme', 'dark')
+                accent = s.get('accent_color', None)
+                font_size = s.get('font_size', 10)
+                scale = s.get('ui_scale', 1.0)
+                apply_theme(theme, accent, font_size)
+                return scale
+    except Exception:
+        pass
+    apply_theme('dark')
+    return 1.0
 
 
 # ── ScrollableFrame ───────────────────────────────────────────────

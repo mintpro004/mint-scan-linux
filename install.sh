@@ -20,11 +20,11 @@ echo -e "${GREEN}  ✓ Done${NC}"
 
 echo -e "${YELLOW}[2/6] Installing system packages...${NC}"
 sudo apt-get update -qq 2>/dev/null || true
-sudo apt-get install -y -qq \
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     python3 python3-pip python3-tk python3-dev python3-venv \
     net-tools wireless-tools iw network-manager \
     nmap adb curl git dbus libnotify-bin sqlite3 \
-    tcpdump clamav clamav-daemon rkhunter 2>/dev/null || true
+    tcpdump clamav clamav-daemon rkhunter ufw iptables-persistent 2>/dev/null || true
 echo -e "${GREEN}  ✓ Done${NC}"
 
 echo -e "${YELLOW}[3/6] Setting up Python environment...${NC}"
@@ -44,10 +44,11 @@ grep -q "class Card"          widgets.py 2>/dev/null || NEEDS_HEAL=true
 grep -q "def __str__"         widgets.py 2>/dev/null && NEEDS_HEAL=true
 grep -q "self\._root ="       widgets.py 2>/dev/null && NEEDS_HEAL=true
 grep -q "CTkScrollableFrame"  widgets.py 2>/dev/null || NEEDS_HEAL=true
+grep -q "apply_theme(name, accent=None, font_size=10)" widgets.py 2>/dev/null || NEEDS_HEAL=true
 
 if [ "$NEEDS_HEAL" = true ]; then
     echo -e "  ${YELLOW}widgets.py healing...${NC}"
-    python3 << 'WIDGETS_HEREDOC'
+    cat > widgets.py << 'WIDGETS_HEREDOC'
 """
 Mint Scan v7 — Shared Widgets
 Uses CTkScrollableFrame (simple + reliable) with proper mouse wheel binding.
@@ -84,14 +85,47 @@ def get_theme():
     return _current_theme
 
 
-def apply_theme(name):
-    global _current_theme
+def apply_theme(name, accent=None, font_size=10):
+    global _current_theme, MONO, MONO_SM, MONO_LG, MONO_XL
     _current_theme = name
-    C.update(LIGHT_THEME if name == 'light' else DARK_THEME)
+    
+    # Update color dictionary
+    base_colors = LIGHT_THEME if name == 'light' else DARK_THEME
+    C.update(base_colors)
+    if accent:
+        C['ac'] = accent
+        
+    # Update font constants
+    fs = font_size
+    MONO    = ('Courier', fs)
+    MONO_SM = ('Courier', max(7, fs - 1))
+    MONO_LG = ('Courier', fs + 3, 'bold')
+    MONO_XL = ('Courier', fs + 26, 'bold')
+    
     try:
         ctk.set_appearance_mode('light' if name == 'light' else 'dark')
     except Exception:
         pass
+
+
+def load_theme_settings():
+    """Helper to load and apply all settings at once"""
+    import json, os
+    settings_file = os.path.expanduser('~/.mint_scan_settings.json')
+    try:
+        if os.path.exists(settings_file):
+            with open(settings_file) as f:
+                s = json.load(f)
+                theme = s.get('theme', 'dark')
+                accent = s.get('accent_color', None)
+                font_size = s.get('font_size', 10)
+                scale = s.get('ui_scale', 1.0)
+                apply_theme(theme, accent, font_size)
+                return scale
+    except Exception:
+        pass
+    apply_theme('dark')
+    return 1.0
 
 
 # ── ScrollableFrame ───────────────────────────────────────────────
@@ -367,7 +401,6 @@ class PortBar(ctk.CTkFrame):
             font=('Courier', 8),
             text_color=C['mu']
         ).pack(anchor='w', padx=10, pady=(0, 6))
-
 WIDGETS_HEREDOC
     echo -e "  \033[0;32m✓ widgets.py healed\033[0m"
 else
@@ -375,26 +408,40 @@ else
 fi
 
 # Heal main.py if missing theme support
-grep -q "apply_theme" main.py 2>/dev/null || {
+grep -q "load_theme_settings" main.py 2>/dev/null || {
     echo -e "  ${YELLOW}main.py healing...${NC}"
     cat > main.py << 'MAINEOF'
 #!/usr/bin/env python3
-"""Mint Scan v7 — Entry point"""
-import sys, os, json
+"""
+Mint Scan v7 — Entry Point
+Loads saved theme before window opens, then launches app.
+"""
+import sys, os
+
+# Add this directory to path first
 BASE = os.path.dirname(os.path.abspath(__file__))
-if BASE not in sys.path: sys.path.insert(0, BASE)
+if BASE not in sys.path:
+    sys.path.insert(0, BASE)
+
+# Apply saved theme BEFORE importing ctk or creating window
+def _load_and_apply_theme():
+    import widgets as _w
+    scale = _w.load_theme_settings()
+    return scale
+
+UI_SCALE = _load_and_apply_theme()
+
+import customtkinter as ctk
 try:
-    with open(os.path.expanduser('~/.mint_scan_settings.json')) as f:
-        theme = json.load(f).get('theme', 'dark')
-except Exception:
-    theme = 'dark'
-try:
-    import widgets as _w; _w.apply_theme(theme)
+    ctk.set_widget_scaling(UI_SCALE)
 except Exception:
     pass
+
 from app import MintScanApp
+
 if __name__ == '__main__':
-    MintScanApp().run()
+    app = MintScanApp()
+    app.run()
 MAINEOF
     echo -e "  ${GREEN}✓ main.py healed${NC}"
 }

@@ -9,7 +9,6 @@ import time
 
 # Import colours and fonts from widgets (single source of truth)
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
-MONO_XL = ('Courier', 36, 'bold')
 
 
 def run_cmd(cmd, timeout=8):

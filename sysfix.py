@@ -219,7 +219,7 @@ class SysFixScreen(ctk.CTkFrame):
                 *run("sudo apt-get update -q", timeout=60)),
             self.after(0, self._log, "Upgrading packages..."),
             (lambda o,e,r: self.after(0, self._log, f"apt upgrade: {'Done' if r==0 else e[-80:]}"))(
-                *run("sudo apt-get upgrade -y -q", timeout=120)),
+                *run("sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q", timeout=120)),
             self.after(0, self._log, "✓ System update complete")
         ), daemon=True).start()
 
@@ -227,7 +227,7 @@ class SysFixScreen(ctk.CTkFrame):
         threading.Thread(target=lambda: (
             self.after(0, self._log, "Cleaning unused packages..."),
             (lambda o,e,r: self.after(0, self._log, o[-200:] or e[-80:]))(
-                *run("sudo apt-get autoremove -y && sudo apt-get autoclean -y", timeout=60)),
+                *run("sudo DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && sudo apt-get autoclean -y", timeout=60)),
             self.after(0, self._log, "✓ Package cleanup done")
         ), daemon=True).start()
 

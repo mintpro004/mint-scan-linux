@@ -12,23 +12,17 @@ if BASE not in sys.path:
 
 # Apply saved theme BEFORE importing ctk or creating window
 def _load_and_apply_theme():
-    import json
-    settings_file = os.path.expanduser('~/.mint_scan_settings.json')
-    theme = 'dark'
-    try:
-        with open(settings_file) as f:
-            d = json.load(f)
-            theme = d.get('theme', 'dark')
-    except Exception:
-        pass
-    # Apply to widgets module colour dict
-    try:
-        import widgets as _w
-        _w.apply_theme(theme)
-    except Exception:
-        pass
+    import widgets as _w
+    scale = _w.load_theme_settings()
+    return scale
 
-_load_and_apply_theme()
+UI_SCALE = _load_and_apply_theme()
+
+import customtkinter as ctk
+try:
+    ctk.set_widget_scaling(UI_SCALE)
+except Exception:
+    pass
 
 from app import MintScanApp
 

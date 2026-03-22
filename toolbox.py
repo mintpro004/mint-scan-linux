@@ -59,9 +59,10 @@ TOOLS = [
         'check':   'clamscan',
         'version': 'clamscan --version 2>/dev/null | head -1',
         'install': [
-            'sudo apt-get install -y clamav clamav-daemon',
+            'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y clamav clamav-daemon',
             'sudo systemctl stop clamav-freshclam 2>/dev/null || true',
-            'sudo freshclam',
+            'sudo freshclam || echo "freshclam: busy or offline, skipping for now"',
+            'sudo systemctl start clamav-freshclam 2>/dev/null || true',
         ],
         'launch':  None,
         'docs':    'clamscan -r ~/  (home scan)',
@@ -118,7 +119,9 @@ TOOLS = [
         'check':   'ufw',
         'version': 'ufw version 2>/dev/null | head -1',
         'install': [
-            'sudo apt-get install -y iptables iptables-persistent nftables 2>/dev/null || true',
+            'echo "iptables-persistent iptables-persistent/autosave_v4 boolean true" | sudo debconf-set-selections',
+            'echo "iptables-persistent iptables-persistent/autosave_v6 boolean true" | sudo debconf-set-selections',
+            'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y iptables iptables-persistent nftables 2>/dev/null || true',
             'sudo apt-get install -y ufw',
             'sudo ufw --force enable',
             'sudo ufw default deny incoming',
