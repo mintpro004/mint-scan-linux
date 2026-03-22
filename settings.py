@@ -223,8 +223,31 @@ class SettingsScreen(ctk.CTkFrame):
         ctk.CTkLabel(sw_row, text="Load dashboard data on launch",
                      font=('Courier',8), text_color=C['mu']).pack(side='left')
 
+        # ── SYSTEM TWEAKS ─────────────────────────────────────
+        SectionHeader(body, '06', 'SYSTEM TWEAKS').pack(fill='x', padx=14, pady=(8,4))
+        tweaks = Card(body)
+        tweaks.pack(fill='x', padx=14, pady=(0,8))
+        
+        tw_grid = ctk.CTkFrame(tweaks, fg_color='transparent')
+        tw_grid.pack(fill='x', padx=12, pady=12)
+        
+        Btn(tw_grid, "🧹 OPTIMISE RAM", 
+            command=lambda: self._run_tweak("sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches"),
+            variant='ghost', width=160).grid(row=0, column=0, padx=4, pady=4)
+        Btn(tw_grid, "🗑 CLEAR LOGS", 
+            command=lambda: self._run_tweak("sudo journalctl --vacuum-time=1d"),
+            variant='ghost', width=160).grid(row=0, column=1, padx=4, pady=4)
+        Btn(tw_grid, "🚫 STOP TELEMETRY", 
+            command=lambda: self._run_tweak("sudo systemctl disable --now apport.service || true"),
+            variant='ghost', width=160).grid(row=1, column=0, padx=4, pady=4)
+        Btn(tw_grid, "🛡 HARDEN KERNEL", 
+            command=lambda: self._run_tweak("echo 'kernel.kptr_restrict=2' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p"),
+            variant='ghost', width=160).grid(row=1, column=1, padx=4, pady=4)
+        tw_grid.columnconfigure(0, weight=1)
+        tw_grid.columnconfigure(1, weight=1)
+
         # ── LIVE PREVIEW ──────────────────────────────────────
-        SectionHeader(body, '06', 'LIVE PREVIEW').pack(fill='x', padx=14, pady=(8,4))
+        SectionHeader(body, '07', 'LIVE PREVIEW').pack(fill='x', padx=14, pady=(8,4))
         self.preview = Card(body)
         self.preview.pack(fill='x', padx=14, pady=(0,8))
         self.prev_title = ctk.CTkLabel(self.preview,
@@ -244,6 +267,16 @@ class SettingsScreen(ctk.CTkFrame):
                                         font=MONO_SM, text_color=C['ok'])
         self.status_lbl.pack(pady=8)
         ctk.CTkLabel(body, text="", height=20).pack()
+
+    def _run_tweak(self, cmd):
+        self.status_lbl.configure(text="Running tweak...", text_color=C['ac'])
+        def _do():
+            from utils import run_cmd
+            out, err, rc = run_cmd(cmd)
+            msg = "✓ Tweak applied" if rc == 0 else f"✗ Failed: {err or out}"
+            self.after(0, lambda m=msg: self.status_lbl.configure(
+                text=m, text_color=C['ok'] if rc==0 else C['wn']))
+        threading.Thread(target=_do, daemon=True).start()
 
     def _load_values(self):
         s = self.settings

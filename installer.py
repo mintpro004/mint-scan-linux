@@ -104,7 +104,7 @@ class InstallerPopup(ctk.CTkToplevel):
 
     def _run_all(self):
         total = len(self._commands)
-        all_ok = True
+        failed_cmds = []
 
         for i, cmd in enumerate(self._commands):
             if self._cancelled:
@@ -118,25 +118,27 @@ class InstallerPopup(ctk.CTkToplevel):
 
             ok = self._run_cmd(cmd)
             if not ok:
-                all_ok = False
+                failed_cmds.append(cmd)
                 self._log_line(f"✗ Step {i+1} failed — see output above")
                 # Don't abort — try remaining steps
                 self._log_line("Continuing with next step...")
 
         if not self._cancelled:
-            if all_ok:
+            if not failed_cmds:
                 self._log_line(f"\n{'='*55}")
                 self._log_line(f"✓ {self._success}")
                 self._set_title(f"✓ {self._success}")
                 self._set_status("Done!", C['ok'])
             else:
                 self._log_line(f"\n{'='*55}")
-                self._log_line("⚠ Some steps had errors — check log above")
-                self._set_title("⚠ Completed with warnings")
-                self._set_status("Completed with warnings", C['am'])
+                self._log_line(f"⚠ {len(failed_cmds)} step(s) had errors:")
+                for fc in failed_cmds:
+                    self._log_line(f"  - {fc[:60]}...")
+                self._set_title("⚠ Completed with errors")
+                self._set_status("Completed with errors", C['am'])
 
         self.after(0, lambda: self._prog.stop())
-        self.after(0, lambda: self._prog.set(1.0 if all_ok else 0.6))
+        self.after(0, lambda: self._prog.set(1.0 if not failed_cmds else 0.6))
         self.after(0, lambda: self._close_btn.configure(state='normal'))
 
         if self._on_done:
@@ -146,10 +148,14 @@ class InstallerPopup(ctk.CTkToplevel):
         """Run a single command and stream output to log"""
         # Replace sudo with pkexec for GUI prompt if not running as root
         if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
-            inner = cmd.strip()[5:]
-            # Safe quoting for bash -c
-            inner_quoted = inner.replace("'", "'\\''")
-            cmd = f"pkexec bash -c '{inner_quoted}'"
+            has_pkexec = os.path.exists('/usr/bin/pkexec') or shutil.which('pkexec')
+            if has_pkexec:
+                inner = cmd.strip()[5:]
+                # Safe quoting for bash -c
+                inner_quoted = inner.replace("'", "'\\''")
+                cmd = f"pkexec bash -c '{inner_quoted}'"
+            else:
+                self._log_line("⚠ Warning: pkexec not found. Sudo may fail or hang in background.")
 
         try:
             proc = subprocess.Popen(

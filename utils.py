@@ -6,6 +6,7 @@ import re
 import json
 import threading
 import time
+import shutil
 
 # Import colours and fonts from widgets (single source of truth)
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
@@ -13,11 +14,16 @@ from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 
 def run_cmd(cmd, timeout=8):
     """Run a shell command safely, using pkexec for sudo if needed."""
-    # Handle sudo via pkexec for GUI apps
+    # Handle sudo via pkexec for GUI apps if pkexec exists
     if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
-        inner = cmd.strip()[5:]
-        inner_quoted = inner.replace("'", "'\\''")
-        cmd = f"pkexec bash -c '{inner_quoted}'"
+        has_pkexec = os.path.exists('/usr/bin/pkexec') or shutil.which('pkexec')
+        if has_pkexec:
+            inner = cmd.strip()[5:]
+            inner_quoted = inner.replace("'", "'\\''")
+            cmd = f"pkexec bash -c '{inner_quoted}'"
+        else:
+            # Fallback to direct sudo (might fail if non-interactive)
+            pass
 
     try:
         r = subprocess.run(

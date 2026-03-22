@@ -156,10 +156,11 @@ class MintScanApp:
         container.pack(fill='both', expand=True)
 
         # ── Sidebar ───────────────────────────────────────────
-        self.sidebar = ctk.CTkFrame(container, width=172,
+        from widgets import ScrollableFrame
+        self.sidebar = ScrollableFrame(container, width=190,
                                     fg_color=C['sf'], corner_radius=0)
         self.sidebar.pack(fill='y', side='left')
-        self.sidebar.pack_propagate(False)
+        # Sidebar doesn't need pack_propagate(False) if it's scrollable and we want it to fill y
 
         # Sidebar header label
         ctk.CTkLabel(self.sidebar, text="NAVIGATION",

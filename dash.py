@@ -74,6 +74,11 @@ class DashScreen(ctk.CTkFrame):
             lbl.pack(side='left')
             setattr(self, f'bar_{name.lower()}_lbl', lbl)
 
+        # Settings button in hero
+        Btn(right, "⚙ CONFIGURE UI & SETTINGS", 
+            command=lambda: self.app._switch_tab('settings'),
+            variant='ghost', width=200).pack(anchor='e', pady=(8,0))
+
         # ── System Info ──
         SectionHeader(body, '01', 'SYSTEM INFORMATION').pack(
             fill='x', padx=14, pady=(10, 4))

@@ -303,7 +303,8 @@ class UsbScreen(ctk.CTkFrame):
         threading.Thread(target=self._do_install_companion, daemon=True).start()
 
     def _do_install_companion(self):
-        dest = '/sdcard/Download/MintScanCompanion.html'
+        # Push to a more standard location
+        dest = '/sdcard/Download/mint_companion.html'
         self._log("Pushing Mint Scan Companion to phone...")
         self.after(0, lambda: self.comp_prog.set(0.3))
 
@@ -323,19 +324,18 @@ class UsbScreen(ctk.CTkFrame):
         self.after(0, lambda: self.comp_prog.set(0.7))
         self._log("Opening companion in phone browser...")
 
-        # Try to open in Chrome
+        # Try to open in Chrome or HTML Viewer
         open_rc = 1
         for intent_cmd in [
+            # HTML Viewer (most reliable for local files)
+            (f"adb -s {self._device} shell am start -n com.android.htmlviewer/com.android.htmlviewer.HTMLViewerActivity "
+             f"-a android.intent.action.VIEW -d 'file://{dest}' -t 'text/html'"),
+            # Chrome direct URL
+            (f"adb -s {self._device} shell am start -n com.android.chrome/com.google.android.apps.chrome.Main "
+             f"-d 'file://{dest}'"),
             # Standard VIEW intent
             (f"adb -s {self._device} shell am start -a android.intent.action.VIEW "
-             f"-t text/html -d 'file:///sdcard/Download/MintScanCompanion.html'"),
-            # Chrome directly
-            (f"adb -s {self._device} shell am start -n "
-             f"com.android.chrome/com.google.android.apps.chrome.Main "
-             f"--es url 'file:///sdcard/Download/MintScanCompanion.html'"),
-            # Generic browser
-            (f"adb -s {self._device} shell am start -a android.intent.action.VIEW "
-             f"'file:///sdcard/Download/MintScanCompanion.html'"),
+             f"-d 'file://{dest}' -t 'text/html'"),
         ]:
             _, _, open_rc = _r(intent_cmd, timeout=8)
             if open_rc == 0:
@@ -345,12 +345,11 @@ class UsbScreen(ctk.CTkFrame):
 
         if open_rc == 0:
             self._log("✓ Companion app is now open on your phone!")
-            self._log("")
-            self._log("The Mint Scan companion dashboard is running.")
-            self._log("Bookmark it on your phone for quick access.")
+            self._log("  Note: If you see ACCESS_DENIED, manually open:")
+            self._log("  Files app → Downloads → mint_companion.html")
         else:
             self._log("✓ App pushed. To open it:")
-            self._log("  Files app → Downloads → MintScanCompanion.html → Open")
+            self._log("  Files app → Downloads → mint_companion.html → Open")
 
         self.after(0, lambda: self.comp_btn.configure(
             state='normal', text='🚀  INSTALL COMPANION ON PHONE'))
@@ -359,13 +358,14 @@ class UsbScreen(ctk.CTkFrame):
         if not self._device:
             self._log("No device connected. Tap ↺ RESCAN first.")
             return
+        dest = '/sdcard/Download/mint_companion.html'
         def _do():
             _, _, rc = _r(
-                f"adb -s {self._device} shell am start -a android.intent.action.VIEW "
-                f"-d 'file:///sdcard/Download/MintScanCompanion.html'",
+                f"adb -s {self._device} shell am start -n com.android.htmlviewer/com.android.htmlviewer.HTMLViewerActivity "
+                f"-a android.intent.action.VIEW -d 'file://{dest}' -t 'text/html'",
                 timeout=8)
             self._log("✓ Opened on phone" if rc == 0
-                      else "Open manually: Files → Downloads → MintScanCompanion.html")
+                      else "Open manually: Files → Downloads → mint_companion.html")
         threading.Thread(target=_do, daemon=True).start()
 
     # ── APK install ───────────────────────────────────────────
