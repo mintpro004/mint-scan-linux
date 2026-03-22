@@ -7,7 +7,7 @@ import customtkinter as ctk
 import threading, time, sys, os, json
 
 # Import colour palette from widgets (single source of truth)
-from widgets import C, apply_theme
+from widgets import C, apply_theme, ScrollableFrame
 
 BOOT_LINES = [
     "INITIALISING MINT SCAN v7...",
@@ -152,12 +152,11 @@ class MintScanApp:
                      fg_color=C['br'], corner_radius=0).pack(fill='x', side='top')
 
         # ── Main container ────────────────────────────────────
-        container = ctk.CTkFrame(self.root, fg_color=C['bg'], corner_radius=0)
-        container.pack(fill='both', expand=True)
+        self.container = ctk.CTkFrame(self.root, fg_color=C['bg'], corner_radius=0)
+        self.container.pack(fill='both', expand=True)
 
         # ── Sidebar ───────────────────────────────────────────
-        from widgets import ScrollableFrame
-        self.sidebar = ScrollableFrame(container, width=190,
+        self.sidebar = ScrollableFrame(self.container, width=190,
                                     fg_color=C['sf'], corner_radius=0)
         self.sidebar.pack(fill='y', side='left')
         # Sidebar doesn't need pack_propagate(False) if it's scrollable and we want it to fill y
@@ -168,7 +167,7 @@ class MintScanApp:
                      ).pack(anchor='w', padx=12, pady=(10,4))
 
         # ── Content area ──────────────────────────────────────
-        self.content = ctk.CTkFrame(container,
+        self.content = ctk.CTkFrame(self.container,
                                     fg_color=C['bg'], corner_radius=0)
         self.content.pack(fill='both', expand=True, side='left')
 
@@ -267,42 +266,19 @@ class MintScanApp:
             frame.destroy()
         self._frames = {}
         
-        # Destroy sidebar buttons
-        for btn in self._tab_btns.values():
-            btn.destroy()
-        self._tab_btns = {}
+        # Destroy sidebar and content areas
+        self.sidebar.destroy()
+        self.content.destroy()
         
-        # Rebuild UI content (sidebar, screens)
-        # Note: self.sidebar and self.content still exist, we just cleared their children
-        # Actually, easiest is to clear container and rebuild from scratch, 
-        # but self.sidebar is inside container.
-        
-        # Clear sidebar content
-        for w in self.sidebar.winfo_children():
-            w.destroy()
-            
-        # Clear content area
-        for w in self.content.winfo_children():
-            w.destroy()
-
-        # Re-initialize screens
+        # Re-initialize modules
         import importlib
-        # We need to re-import modules to get updated C/fonts? 
-        # No, widgets.C is updated in-place. Modules that use `from widgets import C` 
-        # might need reload if they used C at module level, but they use it in __init__ usually.
-        # However, font constants (MONO etc) in widgets.py are updated.
-        # Modules importing them: `from widgets import MONO` -> they have OLD values.
-        # We must reload the modules or update their references.
-        # Given complexity, we'll try to just rebuild and see. 
-        # If fonts don't update, we might need to update the modules' globals.
-        
-        # Re-import to be safe
         import widgets
         import dash, perms, wifi, calls, network, battery, threats, notifs
         import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, settings
         
-        # Force reload of modules that use fonts
+        # Force reload of modules that use fonts/colors
         importlib.reload(widgets)
+        from widgets import C, MONO, MONO_SM, ScrollableFrame
         importlib.reload(dash)
         importlib.reload(perms)
         importlib.reload(wifi)
@@ -320,6 +296,15 @@ class MintScanApp:
         importlib.reload(toolbox)
         importlib.reload(investigate)
         importlib.reload(settings)
+
+        # Re-create sidebar and content areas in the same container
+        self.sidebar = ScrollableFrame(self.container, width=190,
+                                    fg_color=C['sf'], corner_radius=0)
+        self.sidebar.pack(fill='y', side='left')
+        
+        self.content = ctk.CTkFrame(self.container,
+                                    fg_color=C['bg'], corner_radius=0)
+        self.content.pack(fill='both', expand=True, side='left')
 
         # Rebuild sidebar header
         ctk.CTkLabel(self.sidebar, text="NAVIGATION",
@@ -352,11 +337,12 @@ class MintScanApp:
         visible_tabs = [(k, lbl, icon) for k, lbl, icon in ALL_TABS
                         if k in screen_map]
 
+        self._tab_btns = {}
         for key, label, icon in visible_tabs:
             btn = ctk.CTkButton(
                 self.sidebar,
                 text=f" {icon}  {label}",
-                font=('Courier', 10),
+                font=MONO, # Use MONO from widgets (updated size)
                 height=38,
                 anchor='w',
                 fg_color='transparent',
@@ -391,15 +377,12 @@ class MintScanApp:
         else:
             self._switch_tab('dash')
             
-        # Update navbar colors if needed
+        # Update navbar colors
         self.navbar.configure(fg_color=C['sf'])
-        # Also need to update the logo text color, clock color, etc.
-        # But those are in self.navbar which we didn't destroy, just repacked?
-        # No, self.navbar is in self.root. 
-        # To be fully correct, we should update navbar widgets too.
-        # For now, let's just trigger a full app restart if possible, 
-        # but python os.execv is abrupt.
-        # We'll rely on this rebuild for the content area. Navbar might stay old colors until restart.
+        self.score_lbl.configure(text_color=C['ok'])
+        self.clock_lbl.configure(text_color=C['mu'])
+        # Also update root bg
+        self.root.configure(fg_color=C['bg'])
         
     def _switch_tab(self, key):
         if key not in self._frames:
