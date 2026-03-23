@@ -86,13 +86,17 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
     Scrollable container that works on Chromebook, Ubuntu, Kali, WSL.
     Mouse wheel and touchpad two-finger scroll both work.
     """
-    def __init__(self, parent, fg_color=None, **kwargs):
-        kwargs.setdefault('scrollbar_button_color', C['br2'])
-        kwargs.setdefault('scrollbar_button_hover_color', C['ac'])
-        kwargs.setdefault('corner_radius', 0)
+    def __init__(self, parent, **kwargs):
+        fg = kwargs.pop('fg_color', C['bg'])
+        sbc = kwargs.pop('scrollbar_button_color', C['br2'])
+        sbhc = kwargs.pop('scrollbar_button_hover_color', C['ac'])
+        cr = kwargs.pop('corner_radius', 0)
         super().__init__(
-            parent,
-            fg_color=fg_color or C['bg'],
+            master=parent,
+            fg_color=fg,
+            scrollbar_button_color=sbc,
+            scrollbar_button_hover_color=sbhc,
+            corner_radius=cr,
             **kwargs
         )
         # Bind mouse wheel when mouse enters this frame
@@ -140,12 +144,16 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
 
 class Card(ctk.CTkFrame):
     def __init__(self, parent, accent=None, **kwargs):
+        fg = kwargs.pop('fg_color', C['sf'])
+        bc = kwargs.pop('border_color', accent or C['br'])
+        bw = kwargs.pop('border_width', 1)
+        cr = kwargs.pop('corner_radius', 8)
         super().__init__(
             parent,
-            fg_color=C['sf'],
-            border_color=accent or C['br'],
-            border_width=1,
-            corner_radius=8,
+            fg_color=fg,
+            border_color=bc,
+            border_width=bw,
+            corner_radius=cr,
             **kwargs
         )
 
@@ -154,7 +162,8 @@ class Card(ctk.CTkFrame):
 
 class SectionHeader(ctk.CTkFrame):
     def __init__(self, parent, num, title, **kwargs):
-        super().__init__(parent, fg_color='transparent', **kwargs)
+        fg = kwargs.pop('fg_color', 'transparent')
+        super().__init__(parent, fg_color=fg, **kwargs)
         ctk.CTkLabel(
             self, text=f"[{num}]",
             font=MONO_SM, text_color=C['ac']
@@ -172,7 +181,8 @@ class SectionHeader(ctk.CTkFrame):
 
 class InfoGrid(ctk.CTkFrame):
     def __init__(self, parent, items, columns=2, **kwargs):
-        super().__init__(parent, fg_color='transparent', **kwargs)
+        fg = kwargs.pop('fg_color', 'transparent')
+        super().__init__(parent, fg_color=fg, **kwargs)
         for i, item in enumerate(items):
             label = item[0]
             value = str(item[1]) if item[1] is not None else '—'
@@ -209,12 +219,16 @@ class ResultBox(ctk.CTkFrame):
             'info': C['bl'],
             'med':  C['am'],
         }.get(rtype, C['am'])
+        fg = kwargs.pop('fg_color', C['s2'])
+        bc = kwargs.pop('border_color', col)
+        bw = kwargs.pop('border_width', 1)
+        cr = kwargs.pop('corner_radius', 8)
         super().__init__(
             parent,
-            fg_color=C['s2'],
-            border_color=col,
-            border_width=1,
-            corner_radius=8,
+            fg_color=fg,
+            border_color=bc,
+            border_width=bw,
+            corner_radius=cr,
             **kwargs
         )
         ctk.CTkLabel(
@@ -244,18 +258,28 @@ class Btn(ctk.CTkButton):
             'blue':    (C['bl'], C['bl']),
         }
         border_col, text_col = VARIANTS.get(variant, (C['ac'], C['ac']))
+        
+        fg = kwargs.pop('fg_color', 'transparent')
+        bc = kwargs.pop('border_color', border_col)
+        bw = kwargs.pop('border_width', 1)
+        tc = kwargs.pop('text_color', text_col)
+        hc = kwargs.pop('hover_color', C['br2'])
+        cr = kwargs.pop('corner_radius', 4)
+        ht = kwargs.pop('height', 36)
+        wd = kwargs.pop('width', width)
+        
         super().__init__(
             parent,
             text=label,
             font=('Courier', 9),
-            fg_color='transparent',
-            border_color=border_col,
-            border_width=1,
-            text_color=text_col,
-            hover_color=C['br2'],
-            corner_radius=4,
-            height=36,
-            width=width,
+            fg_color=fg,
+            border_color=bc,
+            border_width=bw,
+            text_color=tc,
+            hover_color=hc,
+            corner_radius=cr,
+            height=ht,
+            width=wd,
             command=command,
             **kwargs
         )
@@ -265,12 +289,16 @@ class Btn(ctk.CTkButton):
 
 class Badge(ctk.CTkFrame):
     def __init__(self, parent, label, color, **kwargs):
+        fg = kwargs.pop('fg_color', C['s2'])
+        bc = kwargs.pop('border_color', color)
+        bw = kwargs.pop('border_width', 1)
+        cr = kwargs.pop('corner_radius', 3)
         super().__init__(
             parent,
-            fg_color=C['s2'],
-            border_color=color,
-            border_width=1,
-            corner_radius=3,
+            fg_color=fg,
+            border_color=bc,
+            border_width=bw,
+            corner_radius=cr,
             **kwargs
         )
         ctk.CTkLabel(
@@ -284,7 +312,8 @@ class Badge(ctk.CTkFrame):
 
 class LiveBadge(ctk.CTkFrame):
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, fg_color='transparent', **kwargs)
+        fg = kwargs.pop('fg_color', 'transparent')
+        super().__init__(parent, fg_color=fg, **kwargs)
         self._dot = ctk.CTkLabel(
             self, text='●',
             font=('Courier', 10),
@@ -320,12 +349,18 @@ class PortBar(ctk.CTkFrame):
             '27017': 'MongoDB','4444': 'Meterp!','1337': 'Suspic!',
         }
         col = C['wn'] if port in RISK else C['am'] if port in WARN else C['mu']
+        
+        fg = kwargs.pop('fg_color', C['sf'])
+        bc = kwargs.pop('border_color', col)
+        bw = kwargs.pop('border_width', 1)
+        cr = kwargs.pop('corner_radius', 6)
+        
         super().__init__(
             parent,
-            fg_color=C['sf'],
-            border_color=col,
-            border_width=1,
-            corner_radius=6,
+            fg_color=fg,
+            border_color=bc,
+            border_width=bw,
+            corner_radius=cr,
             **kwargs
         )
         top = ctk.CTkFrame(self, fg_color='transparent')
