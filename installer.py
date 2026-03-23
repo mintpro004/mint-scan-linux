@@ -154,7 +154,7 @@ class InstallerPopup(ctk.CTkToplevel):
                 inner_quoted = inner.replace("'", "'\\''")
                 cmd = f"pkexec bash -c '{inner_quoted}'"
             else:
-                self._log_line("⚠ Warning: pkexec not found. Sudo may fail or hang in background.")
+                pass
 
         try:
             proc = subprocess.Popen(

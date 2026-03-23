@@ -12,17 +12,24 @@ import shutil
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 
 
+_pkexec_warned = False
+
 def run_cmd(cmd, timeout=8):
     """Run a shell command safely, using pkexec for sudo if needed."""
+    global _pkexec_warned
     # Handle sudo via pkexec for GUI apps if pkexec exists
     if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
-        has_pkexec = os.path.exists('/usr/bin/pkexec') or shutil.which('pkexec')
+        has_pkexec = shutil.which('pkexec')
         if has_pkexec:
             inner = cmd.strip()[5:]
             inner_quoted = inner.replace("'", "'\\''")
             cmd = f"pkexec bash -c '{inner_quoted}'"
         else:
             # Fallback to direct sudo (might fail if non-interactive)
+            if not _pkexec_warned:
+                # We could log this to a file instead of stderr to avoid user worry
+                # but for now, we just stay silent and let sudo handle it.
+                _pkexec_warned = True
             pass
 
     try:

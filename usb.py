@@ -182,8 +182,16 @@ class UsbScreen(ctk.CTkFrame):
         sg.columnconfigure(0,weight=1)
         sg.columnconfigure(1,weight=1)
 
-        # ── 06 Output log ─────────────────────────────────────
-        SectionHeader(body,'06','OUTPUT').pack(fill='x', padx=14, pady=(10,4))
+        # ── 06 ADB Forensics ──────────────────────────────────
+        SectionHeader(body,'06','ADB FORENSICS').pack(fill='x', padx=14, pady=(10,4))
+        for_card = Card(body, accent=C['wn'])
+        for_card.pack(fill='x', padx=14, pady=(0,8))
+        
+        ctk.CTkLabel(for_card, text="Check integrity of critical Android system binaries.", font=MONO_SM, text_color=C['mu']).pack(pady=(12,4))
+        Btn(for_card, "🛡 CHECK SYSTEM INTEGRITY", command=self._adb_integrity, variant='warning', width=220).pack(pady=(0,12))
+
+        # ── 07 Output log ─────────────────────────────────────
+        SectionHeader(body,'07','OUTPUT').pack(fill='x', padx=14, pady=(10,4))
         self.output = ctk.CTkTextbox(body, height=160, font=('Courier',10),
                                       fg_color=C['s2'], text_color=C['ok'],
                                       border_color=C['br'], border_width=1,
@@ -193,6 +201,27 @@ class UsbScreen(ctk.CTkFrame):
 
         # Update ADB status on build
         threading.Thread(target=self._check_adb_status, daemon=True).start()
+
+    def _adb_integrity(self):
+        self._log("Checking Android system integrity...")
+        threading.Thread(target=self._do_integrity, daemon=True).start()
+
+    def _do_integrity(self):
+        # Check /system/bin/sh permissions/size
+        out, _, rc = _r("adb shell ls -l /system/bin/sh")
+        if rc == 0:
+            self.after(0, self._log, f"Shell binary:\n{out}")
+        
+        # Check hash of app_process (zygote)
+        # Try sha256sum, md5sum, or just ls -l
+        out, _, rc = _r("adb shell sha256sum /system/bin/app_process32 2>/dev/null")
+        if not out:
+             out, _, rc = _r("adb shell md5sum /system/bin/app_process32 2>/dev/null")
+        
+        if out:
+            self.after(0, self._log, f"Zygote Hash:\n{out}")
+        else:
+            self.after(0, self._log, "Could not compute hash (missing tools on phone).")
 
     # ── Logging ───────────────────────────────────────────────
 

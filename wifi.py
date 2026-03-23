@@ -83,6 +83,56 @@ class WifiScreen(ctk.CTkFrame):
                      text="Tap ▶ SCAN to discover all Wi-Fi networks in range",
                      font=MONO_SM, text_color=C['mu']).pack(pady=20)
 
+        SectionHeader(body, '05', 'EVIL TWIN DETECTION').pack(fill='x', padx=14, pady=(10,4))
+        et_card = Card(body, accent=C['wn'])
+        et_card.pack(fill='x', padx=14, pady=(0,14))
+        
+        ctk.CTkLabel(et_card, text="Scan for duplicate SSIDs with different BSSIDs (MACs).",
+                     font=MONO_SM, text_color=C['mu']).pack(pady=(12,4))
+        
+        self.et_res = ctk.CTkLabel(et_card, text="", font=MONO_SM, text_color=C['wn'])
+        self.et_res.pack(pady=(0,8))
+        
+        Btn(et_card, "💀 CHECK FOR EVIL TWINS", command=self._scan_evil_twin, variant='danger', width=200).pack(pady=(0,12))
+
+    def _scan_evil_twin(self):
+        self.et_res.configure(text="Scanning BSSIDs...", text_color=C['ac'])
+        threading.Thread(target=self._do_et_scan, daemon=True).start()
+
+    def _do_et_scan(self):
+        # Using nmcli to get all APs
+        out, _, rc = run("nmcli -t -f SSID,BSSID,SIGNAL,CHAN device wifi list")
+        if rc != 0:
+            self.et_res.configure(text="Scan failed (requires nmcli)", text_color=C['wn'])
+            return
+
+        ssid_map = {} # SSID -> list of (BSSID, SIGNAL)
+        for line in out.split('\n'):
+            parts = line.split(':')
+            if len(parts) >= 2:
+                ssid = parts[0]
+                bssid = ":".join(parts[1:7]) if len(parts) >= 7 else parts[1]
+                if not ssid: continue
+                
+                if ssid not in ssid_map:
+                    ssid_map[ssid] = []
+                ssid_map[ssid].append(bssid)
+
+        evil_twins = []
+        for ssid, bssids in ssid_map.items():
+            unique_bssids = set(bssids)
+            if len(unique_bssids) > 1:
+                evil_twins.append(f"{ssid} ({len(unique_bssids)} APs)")
+
+        if evil_twins:
+            msg = "POSSIBLE EVIL TWINS FOUND:\n" + "\n".join(evil_twins)
+            col = C['wn']
+        else:
+            msg = "No duplicate SSIDs found."
+            col = C['ok']
+        
+        self.et_res.configure(text=msg, text_color=col)
+
     def _load_current(self):
         out, _, _    = run("nmcli -t -f TYPE,STATE dev 2>/dev/null | head -3")
         ip_out, _, _ = run("ip route get 8.8.8.8 2>/dev/null | grep src | awk '{print $7}' | head -1")

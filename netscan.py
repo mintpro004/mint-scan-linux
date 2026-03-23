@@ -69,6 +69,62 @@ class NetScanScreen(ctk.CTkFrame):
         self.fix_frame = ctk.CTkFrame(body, fg_color='transparent')
         self.fix_frame.pack(fill='x', padx=14, pady=(0,14))
 
+        # Deep Packet Inspection
+        SectionHeader(body, '05', 'DEEP PACKET INSPECTION').pack(fill='x', padx=14, pady=(10,4))
+        dpi_card = Card(body)
+        dpi_card.pack(fill='x', padx=14, pady=(0,14))
+        
+        ctk.CTkLabel(dpi_card, text="Analyze HTTP headers, TLS SNI, and DNS queries for hidden threats.",
+                     font=MONO_SM, text_color=C['mu']).pack(pady=(12,4))
+        
+        self.dpi_res = ctk.CTkTextbox(dpi_card, height=100, font=('Courier',9), fg_color=C['bg'], text_color=C['tx'], border_width=0)
+        self.dpi_res.pack(fill='x', padx=8, pady=8)
+        self.dpi_res.insert('1.0', "Ready to scan.")
+        self.dpi_res.configure(state='disabled')
+        
+        Btn(dpi_card, "🔎 RUN DEEP SCAN (10s)", command=self._dpi_scan, variant='ghost', width=200).pack(pady=(0,12))
+
+    def _dpi_scan(self):
+        self.dpi_res.configure(state='normal')
+        self.dpi_res.delete('1.0', 'end')
+        self.dpi_res.insert('end', "Initializing tshark...\n")
+        self.dpi_res.configure(state='disabled')
+        threading.Thread(target=self._do_dpi, daemon=True).start()
+
+    def _do_dpi(self):
+        # Check tshark
+        if subprocess.run("which tshark", shell=True).returncode != 0:
+            self._log_dpi("Error: 'tshark' not found.\nRun: sudo apt install tshark")
+            return
+
+        self._log_dpi("Capturing traffic (10s)...")
+        # Capture HTTP Host, TLS SNI, DNS Query
+        cmd = ("tshark -i any -a duration:10 -T fields "
+               "-e http.host -e ssl.handshake.extensions_server_name -e dns.qry.name "
+               "-Y 'http.request or ssl.handshake.type==1 or dns.flags.response==0'")
+        
+        out, err, rc = run(cmd, timeout=15)
+        
+        if not out:
+            self._log_dpi("No interesting traffic captured.")
+            return
+
+        unique_hosts = set()
+        for line in out.split('\n'):
+            for part in line.split('\t'):
+                if part.strip():
+                    unique_hosts.add(part.strip())
+        
+        self._log_dpi(f"Captured {len(unique_hosts)} unique domains/hosts:\n")
+        for h in sorted(unique_hosts):
+            self._log_dpi(f"• {h}")
+
+    def _log_dpi(self, msg):
+        self.dpi_res.configure(state='normal')
+        self.dpi_res.insert('end', msg + "\n")
+        self.dpi_res.see('end')
+        self.dpi_res.configure(state='disabled')
+
     def _full_scan(self):
         for w in self.devices_frame.winfo_children(): w.destroy()
         ctk.CTkLabel(self.devices_frame, text="⟳ Scanning network...",

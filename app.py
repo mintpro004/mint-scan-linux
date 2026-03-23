@@ -27,6 +27,7 @@ ALL_TABS = [
     ('network',     'Network',      '📡'),
     ('battery',     'Battery',      '🔋'),
     ('threats',     'Threats',      '⚠'),
+    ('guardian',    'Guardian',     '🛡'),
     ('notifs',      'Notifs',       '🔔'),
     ('ports',       'Port Scan',    '🔍'),
     ('usb',         'USB Sync',     '📱'),
@@ -36,6 +37,7 @@ ALL_TABS = [
     ('firewall',    'Firewall',     '🔥'),
     ('toolbox',     'Toolbox',      '🛠'),
     ('investigate', 'Investigate',  '🕵'),
+    ('auditor',     'Auditor',      '⚖'),
     ('settings',    'Settings',     '⚙'),
 ]
 
@@ -202,6 +204,8 @@ class MintScanApp:
             'firewall':    _safe('firewall',    'FirewallScreen'),
             'toolbox':     _safe('toolbox',     'ToolboxScreen'),
             'investigate': _safe('investigate', 'InvestigateScreen'),
+            'auditor':     _safe('auditor',     'AuditorScreen'),
+            'guardian':    _safe('guardian',    'GuardianScreen'),
             'settings':    _safe('settings',    'SettingsScreen'),
         }
         # Only keep successfully loaded screens
@@ -274,7 +278,7 @@ class MintScanApp:
         import importlib
         import widgets
         import dash, perms, wifi, calls, network, battery, threats, notifs
-        import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, settings
+        import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, auditor, guardian, settings
         
         # Force reload of modules that use fonts/colors
         importlib.reload(widgets)
@@ -295,6 +299,8 @@ class MintScanApp:
         importlib.reload(firewall)
         importlib.reload(toolbox)
         importlib.reload(investigate)
+        importlib.reload(auditor)
+        importlib.reload(guardian)
         importlib.reload(settings)
 
         # Re-create sidebar and content areas in the same container
@@ -330,6 +336,8 @@ class MintScanApp:
             'firewall':    firewall.FirewallScreen,
             'toolbox':     toolbox.ToolboxScreen,
             'investigate': investigate.InvestigateScreen,
+            'auditor':     auditor.AuditorScreen,
+            'guardian':    guardian.GuardianScreen,
             'settings':    settings.SettingsScreen,
         }
 

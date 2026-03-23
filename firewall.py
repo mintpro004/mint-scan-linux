@@ -125,13 +125,64 @@ class FirewallScreen(ctk.CTkFrame):
         self.ipt_box.pack(fill='x', padx=8, pady=(0,8))
         self.ipt_box.configure(state='normal')
 
+        # ── VPN Killswitch ────────────────────────────────────
+        SectionHeader(body, '06', 'VPN KILLSWITCH').pack(fill='x', padx=14, pady=(8,4))
+        ks_card = Card(body, accent=C['wn'])
+        ks_card.pack(fill='x', padx=14, pady=(0,8))
+        
+        ctk.CTkLabel(ks_card, text="Block all traffic if VPN drops (allows tun0/wg0 only)",
+                     font=MONO_SM, text_color=C['mu']).pack(pady=(12,4))
+        
+        self.ks_btn = Btn(ks_card, "🛡 ENABLE KILLSWITCH", command=self._toggle_killswitch, variant='primary', width=200)
+        self.ks_btn.pack(pady=(0,12))
+
         # ── Action output ─────────────────────────────────────
-        SectionHeader(body, '06', 'ACTION OUTPUT').pack(fill='x', padx=14, pady=(8,4))
+        SectionHeader(body, '07', 'ACTION OUTPUT').pack(fill='x', padx=14, pady=(8,4))
         self.action_log = ctk.CTkTextbox(body, height=110, font=('Courier',10),
                                           fg_color=C['s2'], text_color=C['ok'],
                                           border_color=C['br'], border_width=1, corner_radius=6)
         self.action_log.pack(fill='x', padx=14, pady=(0,14))
         self.action_log.configure(state='normal')
+
+    def _toggle_killswitch(self):
+        # Check if ufw installed
+        if shutil.which('ufw') is None:
+            self._alog("Error: ufw not found.")
+            return
+
+        # Check current state (naive check)
+        btn_text = self.ks_btn.cget('text')
+        if "ENABLE" in btn_text:
+            # Enabling
+            self._alog("Enabling VPN Killswitch...")
+            # Find vpn interface
+            out, _, _ = _run("ip -o link show | grep -E 'tun|wg'")
+            if not out:
+                self._alog("Error: No VPN interface (tun/wg) found!")
+                return
+            
+            # Simple UFW logic: default deny outgoing, allow out on vpn, allow out to vpn server (hard to know IP)
+            # This is risky without knowing VPN IP.
+            # Safer: just deny outgoing on physical, allow on tun.
+            
+            _run("ufw default deny outgoing")
+            _run("ufw default deny incoming")
+            _run("ufw allow out on tun0")
+            _run("ufw allow out on wg0")
+            _run("ufw allow out on lo") # Loopback
+            # We must allow connection to the VPN server itself, but we don't know the IP.
+            # This is a strict killswitch. User might get locked out of connecting to VPN.
+            # Warn user.
+            
+            self._alog("Killswitch ENABLED. Only tun0/wg0/lo traffic allowed out.")
+            self._alog("⚠ Note: If VPN is not connected, you cannot connect to it!")
+            self.ks_btn.configure(text="❌ DISABLE KILLSWITCH", variant='danger')
+        else:
+            # Disabling
+            self._alog("Disabling Killswitch (resetting to default)...")
+            _run("ufw default allow outgoing")
+            self._alog("Outgoing traffic allowed.")
+            self.ks_btn.configure(text="🛡 ENABLE KILLSWITCH", variant='primary')
 
     # ── Logging ───────────────────────────────────────────────
 
