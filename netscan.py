@@ -4,7 +4,7 @@ import customtkinter as ctk
 import threading, subprocess, re, time, os
 from installer import install_nmap
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-from utils import run_cmd as run
+from utils import run_cmd as run, copy_to_clipboard
 from reports import prompt_save_report
 
 
@@ -48,9 +48,21 @@ class NetScanScreen(ctk.CTkFrame):
         SectionHeader(body, '02', 'LIVE TRAFFIC CAPTURE').pack(fill='x', padx=14, pady=(10,4))
         self.traffic_card = Card(body)
         self.traffic_card.pack(fill='x', padx=14, pady=(0,8))
-        self.cap_status = ctk.CTkLabel(self.traffic_card, text="● IDLE — tap 📡 TRAFFIC to start",
+        
+        tf_hdr = ctk.CTkFrame(self.traffic_card, fg_color='transparent')
+        tf_hdr.pack(fill='x', padx=8, pady=(4,0))
+        
+        self.cap_status = ctk.CTkLabel(tf_hdr, text="● IDLE — tap 📡 TRAFFIC to start",
                                         font=MONO_SM, text_color=C['mu'])
-        self.cap_status.pack(anchor='w', padx=12, pady=(8,4))
+        self.cap_status.pack(side='left', padx=4)
+        
+        self.analyze_btn = Btn(tf_hdr, "📊 ANALYZE", command=self._analyze_traffic, variant='blue', width=90)
+        self.analyze_btn.pack(side='right', padx=4)
+        self.save_log_btn = Btn(tf_hdr, "💾 SAVE LOG", command=self._save_traffic_log, variant='ghost', width=90)
+        self.save_log_btn.pack(side='right', padx=4)
+        self.copy_log_btn = Btn(tf_hdr, "📋 COPY", command=self._copy_traffic_log, variant='ghost', width=80)
+        self.copy_log_btn.pack(side='right', padx=4)
+
         self.traffic_log = ctk.CTkTextbox(self.traffic_card, height=160,
                                            font=('Courier',10), fg_color=C['bg'],
                                            text_color=C['ac'], border_width=0)
@@ -263,6 +275,53 @@ class NetScanScreen(ctk.CTkFrame):
         self.traffic_log.insert('end', msg + '\n')
         self.traffic_log.see('end')
 
+    def _copy_traffic_log(self):
+        txt = self.traffic_log.get('1.0', 'end').strip()
+        if txt and copy_to_clipboard(txt):
+            self.cap_status.configure(text="● LOG COPIED", text_color=C['ok'])
+
+    def _save_traffic_log(self):
+        txt = self.traffic_log.get('1.0', 'end').strip()
+        if not txt: return
+        import tkinter.filedialog as fd
+        path = fd.asksaveasfilename(defaultextension=".txt", initialfile="traffic_log.txt")
+        if path:
+            with open(path, 'w') as f:
+                f.write(txt)
+            self.cap_status.configure(text=f"● SAVED TO {os.path.basename(path)}", text_color=C['ok'])
+
+    def _analyze_traffic(self):
+        txt = self.traffic_log.get('1.0', 'end').strip()
+        if not txt: return
+        
+        self.cap_status.configure(text="● ANALYZING...", text_color=C['ac'])
+        
+        # Simple analysis
+        lines = txt.split('\n')
+        total = len(lines)
+        ips = re.findall(r'(\d+\.\d+\.\d+\.\d+)', txt)
+        unique_ips = set(ips)
+        
+        http = sum(1 for l in lines if 'HTTP' in l.upper() or '.80 ' in l or '.443 ' in l)
+        dns = sum(1 for l in lines if 'DNS' in l.upper() or '.53 ' in l)
+        
+        report_text = [
+            f"Total Packets Captured: {total}",
+            f"Unique IP Addresses: {len(unique_ips)}",
+            f"HTTP/HTTPS Traffic: {http} packets",
+            f"DNS Queries: {dns} packets",
+            "",
+            "PEER LIST:"
+        ]
+        for ip in sorted(unique_ips)[:15]:
+            report_text.append(f" • {ip}")
+            
+        prompt_save_report(self, "Traffic Analysis", "Packet Capture Report", [
+            ("SUMMARY", report_text, "INFO"),
+            ("RAW DATA SNIPPET", lines[:50], "OK")
+        ])
+        self.cap_status.configure(text="● ANALYSIS COMPLETE", text_color=C['ok'])
+
     def _vuln_scan(self):
         for w in self.vuln_frame.winfo_children(): w.destroy()
         for w in self.fix_frame.winfo_children(): w.destroy()
@@ -380,8 +439,4 @@ class NetScanScreen(ctk.CTkFrame):
         prompt_save_report(self, gateway, "Network Security Audit", sections)
 
     def _copy(self, text):
-        try:
-            subprocess.run(f"echo '{text}' | xclip -selection clipboard",
-                           shell=True, timeout=3)
-        except Exception:
-            pass
+        copy_to_clipboard(text)

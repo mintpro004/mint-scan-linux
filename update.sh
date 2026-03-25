@@ -21,6 +21,12 @@ if [ -d ".git" ]; then
         echo -e "\033[0;32m[ MINT SCAN ]\033[0m Pull successful."
     else
         echo -e "\033[0;31m[ MINT SCAN ]\033[0m Pull failed. Checking connectivity..."
+        if ! ping -c 1 -W 5 8.8.8.8 > /dev/null 2>&1; then
+            echo -e "\033[0;31m[ MINT SCAN ]\033[0m ERROR: No internet connection."
+        elif ! nslookup github.com > /dev/null 2>&1; then
+            echo -e "\033[0;31m[ MINT SCAN ]\033[0m ERROR: DNS resolution failed (cannot find github.com)."
+        fi
+        echo -e "\033[0;33m[ MINT SCAN ]\033[0m Proceeding with local self-healing only..."
     fi
 
     # Bring back our fixes

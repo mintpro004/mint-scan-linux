@@ -351,32 +351,36 @@ class UsbScreen(ctk.CTkFrame):
         self.after(0, lambda: self.comp_prog.set(0.7))
         self._log("Opening companion in phone browser...")
 
-        # Try to open in Chrome or HTML Viewer
+        # Try to open in Chrome, HTML Viewer, or generic VIEW intent
         open_rc = 1
-        for intent_cmd in [
-            # HTML Viewer (most reliable for local files)
-            (f"adb -s {self._device} shell am start -n com.android.htmlviewer/com.android.htmlviewer.HTMLViewerActivity "
-             f"-a android.intent.action.VIEW -d 'file://{dest}' -t 'text/html'"),
-            # Chrome direct URL
-            (f"adb -s {self._device} shell am start -n com.android.chrome/com.google.android.apps.chrome.Main "
-             f"-d 'file://{dest}'"),
-            # Standard VIEW intent
-            (f"adb -s {self._device} shell am start -a android.intent.action.VIEW "
-             f"-d 'file://{dest}' -t 'text/html'"),
-        ]:
-            _, _, open_rc = _r(intent_cmd, timeout=8)
-            if open_rc == 0:
+        intents = [
+            # 1. HTML Viewer (most reliable for local files)
+            f"adb -s {self._device} shell am start -n com.android.htmlviewer/com.android.htmlviewer.HTMLViewerActivity -a android.intent.action.VIEW -d 'file://{dest}' -t 'text/html'",
+            # 2. Chrome direct URL
+            f"adb -s {self._device} shell am start -n com.android.chrome/com.google.android.apps.chrome.Main -d 'file://{dest}'",
+            # 3. Samsung Browser (common on many devices)
+            f"adb -s {self._device} shell am start -n com.sec.android.app.sbrowser/com.sec.android.app.sbrowser.SBrowserMainActivity -d 'file://{dest}'",
+            # 4. Generic VIEW intent (let Android decide)
+            f"adb -s {self._device} shell am start -a android.intent.action.VIEW -d 'file://{dest}' -t 'text/html'",
+            # 5. Generic VIEW intent without type (sometimes works better)
+            f"adb -s {self._device} shell am start -a android.intent.action.VIEW -d 'file://{dest}'"
+        ]
+        
+        for intent_cmd in intents:
+            out, err, open_rc = _r(intent_cmd, timeout=8)
+            if open_rc == 0 and "Error" not in out:
                 break
 
         self.after(0, lambda: self.comp_prog.set(1.0))
 
         if open_rc == 0:
-            self._log("✓ Companion app is now open on your phone!")
+            self._log("✓ Companion app intent sent to phone.")
+            self._log("  Note: If it asks which app to use, pick HTML Viewer or Browser.")
             self._log("  Note: If you see ACCESS_DENIED, manually open:")
             self._log("  Files app → Downloads → mint_companion.html")
         else:
-            self._log("✓ App pushed. To open it:")
-            self._log("  Files app → Downloads → mint_companion.html → Open")
+            self._log("✓ App pushed to /sdcard/Download/mint_companion.html")
+            self._log("  To open it manually: Files app → Downloads → Open mint_companion.html")
 
         self.after(0, lambda: self.comp_btn.configure(
             state='normal', text='🚀  INSTALL COMPANION ON PHONE'))

@@ -82,6 +82,25 @@ def ping(host='1.1.1.1', count=1):
     return None
 
 
+def copy_to_clipboard(text):
+    """Copy text to clipboard using tkinter or xclip."""
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        root.clipboard_clear()
+        root.clipboard_append(text)
+        root.update() # now it stays on the clipboard
+        root.destroy()
+        return True
+    except Exception:
+        try:
+            subprocess.run(f"echo -n '{text}' | xclip -selection clipboard", shell=True, timeout=2)
+            return True
+        except Exception:
+            return False
+
+
 def get_wifi_networks():
     """
     Real Wi-Fi scan using nmcli (NetworkManager).
@@ -90,9 +109,19 @@ def get_wifi_networks():
     networks = []
 
     # Method 1: nmcli (best, works on most Linux)
+    # Try to trigger a rescan first
+    run_cmd("nmcli device wifi rescan 2>/dev/null", timeout=5)
+    
     out, err, rc = run_cmd(
         "nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null"
     )
+    
+    # If nmcli failed or returned nothing, try with sudo (some systems require it for scanning)
+    if (rc != 0 or not out) and os.geteuid() != 0:
+        out, err, rc = run_cmd(
+            "sudo nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null"
+        )
+
     if rc == 0 and out:
         for line in out.strip().split('\n'):
             if not line.strip():

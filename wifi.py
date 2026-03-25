@@ -3,7 +3,7 @@ import tkinter as tk
 import customtkinter as ctk
 import threading, subprocess, re, os
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-from utils import run_cmd as run, get_wifi_networks, get_current_wifi
+from utils import run_cmd as run, get_wifi_networks, get_current_wifi, copy_to_clipboard
 
 
 def sig_color(sig):
@@ -71,6 +71,9 @@ class WifiScreen(ctk.CTkFrame):
                      font=MONO_SM, text_color=C['mu']).pack(padx=12, pady=10)
 
         SectionHeader(body, '03', 'YOUR SAVED NETWORKS').pack(fill='x', padx=14, pady=(10,4))
+        self.saved_hdr = ctk.CTkFrame(body, fg_color='transparent')
+        self.saved_hdr.pack(fill='x', padx=14)
+        
         self.saved_frame = ctk.CTkFrame(body, fg_color='transparent')
         self.saved_frame.pack(fill='x', padx=14, pady=(0,6))
         ctk.CTkLabel(self.saved_frame, text="Tap ▶ SCAN to load saved networks",
@@ -228,12 +231,17 @@ class WifiScreen(ctk.CTkFrame):
                          font=MONO_SM, text_color=C['mu']).pack(padx=12, pady=(0,8))
 
     def _render_saved(self, saved):
+        for w in self.saved_hdr.winfo_children(): w.destroy()
         for w in self.saved_frame.winfo_children(): w.destroy()
         if not saved:
             ctk.CTkLabel(self.saved_frame,
                          text="No saved networks found. Connect to Wi-Fi to populate this list.",
                          font=MONO_SM, text_color=C['mu']).pack(pady=8)
             return
+            
+        Btn(self.saved_hdr, "📋 COPY ALL", command=lambda: self._copy_all_saved(saved),
+            variant='ghost', width=120).pack(side='right', pady=(0,4))
+            
         ctk.CTkLabel(self.saved_frame, text=f"{len(saved)} saved network(s):",
                      font=('Courier',9,'bold'), text_color=C['ac']).pack(anchor='w', pady=(0,4))
         for net in saved[:20]:
@@ -250,20 +258,30 @@ class WifiScreen(ctk.CTkFrame):
             Btn(row, "SHOW PWD", command=lambda n=net['name']: self._show_password(n),
                 variant='ghost', width=90).pack(side='right', padx=8)
 
+    def _copy_all_saved(self, saved):
+        text = "MINT SCAN - SAVED WI-FI NETWORKS\n" + "="*40 + "\n"
+        for net in saved:
+            text += f"SSID: {net['name']}  Last Used: {net['last']}\n"
+        if copy_to_clipboard(text):
+            self.status_lbl.configure(text="Saved networks copied to clipboard", text_color=C['ok'])
+
     def _show_password(self, name):
         out, _, rc = run(f"sudo nmcli -s -g 802-11-wireless-security.psk connection show '{name}' 2>/dev/null")
         popup = ctk.CTkToplevel(self)
         popup.title(f"Password: {name}")
-        popup.geometry("420x160")
+        popup.geometry("420x200")
         popup.configure(fg_color=C['bg'])
         popup.attributes('-topmost', True)
         if rc == 0 and out.strip():
+            pwd = out.strip()
             ctk.CTkLabel(popup, text=name, font=('Courier',12,'bold'),
                          text_color=C['ac']).pack(pady=(12,4))
             e = ctk.CTkEntry(popup, font=('Courier',13,'bold'),
                              fg_color=C['s2'], border_color=C['ac'], text_color=C['ok'])
             e.pack(fill='x', padx=20, pady=8)
-            e.insert(0, out.strip())
+            e.insert(0, pwd)
+            Btn(popup, "📋 COPY PASSWORD", command=lambda: copy_to_clipboard(pwd),
+                variant='success').pack(pady=4)
         else:
             ctk.CTkLabel(popup,
                 text=f"Cannot read: {name}\n\nMake sure to ALLOW the pkexec prompt.",
