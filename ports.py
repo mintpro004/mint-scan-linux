@@ -16,6 +16,9 @@ WELL_KNOWN = {
     '4444': 'Metasploit⚠', '1337': 'Suspicious⚠',
 }
 
+KNOWN_BAD_PORTS = ['4444', '1337', '31337', '666', '6667']
+RISKY_PORTS = ['21', '23', '3389', '5900', '161']
+
 
 class PortsScreen(ctk.CTkFrame):
     def __init__(self, parent, app):

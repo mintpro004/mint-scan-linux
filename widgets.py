@@ -284,6 +284,22 @@ class Btn(ctk.CTkButton):
             **kwargs
         )
 
+    def configure(self, **kwargs):
+        if 'variant' in kwargs:
+            variant = kwargs.pop('variant')
+            VARIANTS = {
+                'primary': (C['ac'], C['ac']),
+                'danger':  (C['wn'], C['wn']),
+                'warning': (C['am'], C['am']),
+                'success': (C['ok'], C['ok']),
+                'ghost':   (C['br'], C['mu']),
+                'blue':    (C['bl'], C['bl']),
+            }
+            bc, tc = VARIANTS.get(variant, (C['ac'], C['ac']))
+            kwargs['border_color'] = bc
+            kwargs['text_color'] = tc
+        super().configure(**kwargs)
+
 
 # ── Badge ─────────────────────────────────────────────────────────
 

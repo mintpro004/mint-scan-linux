@@ -23,7 +23,7 @@ sudo apt-get update -qq 2>/dev/null || true
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     python3 python3-pip python3-tk python3-dev python3-venv \
     net-tools wireless-tools iw network-manager \
-    nmap adb curl git dbus libnotify-bin sqlite3 \
+    nmap adb curl git dbus libnotify-bin sqlite3 xclip \
     tcpdump clamav clamav-daemon rkhunter ufw iptables-persistent \
     auditd tshark 2>/dev/null || true
 echo -e "${GREEN}  ✓ Done${NC}"

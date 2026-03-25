@@ -17,7 +17,7 @@ if [ -d ".git" ]; then
         STASHED=true
     fi
 
-    if git pull origin main; then
+    if git pull --rebase origin main; then
         echo -e "\033[0;32m[ MINT SCAN ]\033[0m Pull successful."
     else
         echo -e "\033[0;31m[ MINT SCAN ]\033[0m Pull failed. Checking connectivity..."
