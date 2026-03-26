@@ -111,11 +111,12 @@ class NetScanScreen(ctk.CTkFrame):
 
         self._log_dpi("Capturing traffic (10s)...")
         # Capture HTTP Host, TLS SNI, DNS Query
-        cmd = ("tshark -i any -a duration:10 -T fields "
+        # Use sudo to ensure capture permissions via pkexec fallback
+        cmd = ("sudo tshark -i any -a duration:10 -T fields "
                "-e http.host -e ssl.handshake.extensions_server_name -e dns.qry.name "
                "-Y 'http.request or ssl.handshake.type==1 or dns.flags.response==0'")
         
-        out, err, rc = run(cmd, timeout=15)
+        out, err, rc = run(cmd, timeout=20)
         
         if not out:
             self._log_dpi("No interesting traffic captured.")
@@ -214,11 +215,66 @@ class NetScanScreen(ctk.CTkFrame):
                 meta += f"  Host: {dev['host']}"
             ctk.CTkLabel(left, text=meta, font=('Courier',8),
                          text_color=C['mu']).pack(anchor='w')
-            # Scan ports button
-            Btn(row, "SCAN PORTS",
+            # Action buttons
+            btn_box = ctk.CTkFrame(row, fg_color='transparent')
+            btn_box.pack(side='right', padx=12, pady=8)
+
+            Btn(btn_box, "🛡 SAFETY CHECK",
+                command=lambda ip=dev['ip'], r=row: self._safety_check(ip, r),
+                variant='warning', width=110
+                ).pack(side='top', pady=2)
+
+            Btn(btn_box, "SCAN PORTS",
                 command=lambda ip=dev['ip']: self._scan_device(ip),
-                variant='ghost', width=100
-                ).pack(side='right', padx=12)
+                variant='ghost', width=110
+                ).pack(side='top', pady=2)
+
+    def _safety_check(self, ip, row):
+        """Perform a safety audit on a specific device"""
+        # Add a status label to the row if it doesn't exist
+        if not hasattr(row, 'status_lbl'):
+            row.status_lbl = ctk.CTkLabel(row, text="⌛ Checking...", font=('Courier',8,'bold'), text_color=C['ac'])
+            row.status_lbl.pack(side='right', padx=10)
+        else:
+            row.status_lbl.configure(text="⌛ Checking...", text_color=C['ac'])
+
+        threading.Thread(target=self._do_safety_check, args=(ip, row), daemon=True).start()
+
+    def _do_safety_check(self, ip, row):
+        # 1. Quick port scan for high-risk ports
+        dangerous = {'21':'FTP', '22':'SSH', '23':'Telnet', '445':'SMB/WannaCry', '3389':'RDP', '4444':'Metasploit'}
+        out, _, _ = run(f"nmap -T4 -F {ip} 2>/dev/null", timeout=15)
+        
+        found_ports = []
+        for port, svc in dangerous.items():
+            if f"{port}/tcp open" in out:
+                found_ports.append(svc)
+
+        # 2. Check for suspicious vendor/hostname
+        is_threat = False
+        reason = ""
+        
+        # Simulated/Simple logic: if many dangerous ports open, or specific ones like 4444
+        if 'Metasploit' in found_ports or 'Telnet' in found_ports:
+            is_threat = True
+            reason = "Critical: Dangerous services (Telnet/Metasploit) exposed."
+        elif len(found_ports) >= 3:
+            is_threat = True
+            reason = f"Warning: {len(found_ports)} risky ports open ({', '.join(found_ports)})."
+        
+        # 3. Final verdict
+        if is_threat:
+            self.after(0, lambda: (
+                row.configure(border_color=C['wn']),
+                row.status_lbl.configure(text="💀 THREAT", text_color=C['wn']),
+                self._log_traffic(f"[!] SECURITY ALERT: Device {ip} is considered UNSAFE. {reason}")
+            ))
+        else:
+            self.after(0, lambda: (
+                row.configure(border_color=C['ok']),
+                row.status_lbl.configure(text="✓ SAFE", text_color=C['ok']),
+                self._log_traffic(f"[*] Device {ip} passed basic safety check. Ports found: {', '.join(found_ports) or 'None'}")
+            ))
 
     def _scan_device(self, ip):
         threading.Thread(target=self._do_device_scan, args=(ip,), daemon=True).start()

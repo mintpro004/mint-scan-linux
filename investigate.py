@@ -736,9 +736,8 @@ class InvestigateScreen(ctk.CTkFrame):
         threading.Thread(target=_do, daemon=True).start()
 
     def _copy(self, text):
-        try:
-            subprocess.run(f"echo '{text}' | xclip -selection clipboard",
-                           shell=True, timeout=3)
-            self._log(f"Copied: {text}")
-        except Exception:
-            self._log(f"Copy: {text}")
+        from utils import copy_to_clipboard
+        if copy_to_clipboard(text):
+            self._log(f"Copied to clipboard: {text}")
+        else:
+            self._log(f"Failed to copy: {text}")
