@@ -1,10 +1,10 @@
 """Notifications Screen — system notifications via dbus/libnotify"""
+from widgets import C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader, ResultBox, Btn
 import tkinter as tk
 import customtkinter as ctk
 import threading, time, subprocess
-from utils import C, MONO, MONO_SM, run_cmd
+from utils import run_cmd
 from installer import install_kdeconnect
-from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn
 
 
 class NotifsScreen(ctk.CTkFrame):

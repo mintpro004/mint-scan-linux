@@ -22,9 +22,6 @@ class AuditorScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
-        # Auto-verify baseline on focus if it exists
-        if os.path.exists(self._baseline_file):
-            threading.Thread(target=self._verify_integrity, daemon=True).start()
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -89,14 +86,11 @@ class AuditorScreen(ctk.CTkFrame):
     def _monitor_audit(self):
         # Tail audit.log or run ausearch -m USER_AUTH,EXECVE -ts recent -w
         # Fallback to tailing /var/log/auth.log if auditd missing
-        # Using sudo to ensure access to log files
-        cmd = "sudo tail -f /var/log/audit/audit.log 2>/dev/null"
+        cmd = "tail -f /var/log/audit/audit.log 2>/dev/null"
         if not os.path.exists('/var/log/audit/audit.log'):
-             cmd = "sudo tail -f /var/log/auth.log"
+             cmd = "tail -f /var/log/auth.log"
         
-        from utils import get_sudo_cmd
-        # We use Popen directly for streaming. get_sudo_cmd handles pkexec translation.
-        proc = subprocess.Popen(get_sudo_cmd(cmd), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         while self._monitoring:
             line = proc.stdout.readline()
             if line:

@@ -1,11 +1,11 @@
 """Network Screen — real speed test, ping graph, connections"""
+from widgets import C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, LiveBadge
 import tkinter as tk
 import customtkinter as ctk
 import threading
 import time
 import socket
-from utils import C, MONO, MONO_SM, get_network_interfaces, get_public_ip_info, get_local_ip, get_active_connections, ping, run_cmd
-from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, LiveBadge
+from utils import get_network_interfaces, get_public_ip_info, get_local_ip, get_active_connections, ping, run_cmd
 
 
 class NetworkScreen(ctk.CTkFrame):

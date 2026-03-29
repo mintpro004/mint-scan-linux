@@ -1,9 +1,9 @@
 """Permissions Screen — Linux file/device/network permissions"""
+from widgets import C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 import tkinter as tk
 import customtkinter as ctk
 import threading, os, stat
-from utils import C, MONO, MONO_SM, run_cmd, check_root
-from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
+from utils import run_cmd, check_root
 
 
 class PermsScreen(ctk.CTkFrame):

@@ -1,9 +1,9 @@
 """Battery Screen — real /sys/class/power_supply data"""
+from widgets import C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 import tkinter as tk
 import customtkinter as ctk
 import threading, time
-from utils import C, MONO, MONO_SM, get_battery_info
-from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
+from utils import get_battery_info
 
 
 class BatteryScreen(ctk.CTkFrame):

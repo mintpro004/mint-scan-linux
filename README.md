@@ -1,125 +1,61 @@
-# Mint Scan v6 — Linux Desktop Security Auditor
-**by Mint Projects, Pretoria**
+# Mint Scan v7 — Advanced Linux Security Auditor
+**By Mint Projects, Pretoria**
 
-A full GUI security dashboard for Linux — Chromebook, Ubuntu, Debian, Kali.
-
----
-
-## Features
-
-| Screen | What it does | Data Source |
-|---|---|---|
-| **Dashboard** | System info, public IP, ISP, RAM, disk, CPU, battery | `/proc`, `/sys`, `ipapi.co` |
-| **Wi-Fi** | Live scan of all nearby networks — SSID, security, signal | `nmcli` / `iwlist` |
-| **Calls** | GNOME Calls history + KDE Connect Android integration | `~/.local/share/gnome-calls/` |
-| **Network** | Interfaces, live ping graph, real speed test, connections | `netifaces`, `speedtest-cli` |
-| **Battery** | Level, status, health, voltage, current, cycles | `/sys/class/power_supply/` |
-| **Permissions** | Root status, sudo rules, device file access, firewall | `ufw`, `sudoers`, `/dev/` |
-| **Threats** | Root check, open ports, SSH config, firewall, processes | `ss`, `ufw`, `/etc/ssh/` |
-| **Notifications** | Real-time D-Bus notification monitor | `dbus-monitor` |
-| **Port Scanner** | Local open ports + remote host scanner | `ss`, `nmap`, Python sockets |
-
----
-
-## Install on Chromebook (Linux environment)
-
-### Step 1 — Enable Linux on Chromebook
-Settings → Advanced → Developers → Linux development environment → Turn on
-
-### Step 2 — Clone from GitHub
+## Quick Start
 ```bash
-git clone https://github.com/mintpro004/mint-scan-linux.git
-cd mint-scan-linux
+bash install.sh
+bash run.sh
 ```
 
-### Step 3 — Run installer
-```bash
-chmod +x install.sh
-./install.sh
-```
+## What's Included (20 Screens)
+| Tab | Description |
+|-----|-------------|
+| Dashboard | System overview, security score, IP info |
+| Permissions | File/sudo/SUID permission checker |
+| Wi-Fi | Network scanner, signal strength, encryption |
+| Calls | Call log analysis, number risk scoring |
+| Network | Interfaces, active connections, public IP |
+| Battery | Live battery stats from /sys/class/power_supply |
+| Threats | Port scan, process audit, auto-remediation |
+| Guardian | Auto-defense, panic button, USB lockdown |
+| Notifs | Desktop notification monitor |
+| Port Scan | TCP/UDP open ports with risk flags |
+| USB Sync | **Phone companion via USB (ADB)** |
+| Wireless | **Wi-Fi companion server (no cable needed)** |
+| Net Scan | Device discovery, traffic capture, vuln scan |
+| Malware | ClamAV integration, rootkit check (rkhunter) |
+| Sys Fix | System health, permissions, firewall repair |
+| Firewall | UFW rules manager, add/remove rules |
+| Toolbox | Install/manage all security tools |
+| Investigate | IP geolocation, WHOIS, attack timeline |
+| Auditor | Kernel audit (auditd), binary integrity |
+| Settings | Theme, accent color, font size |
 
-### Step 4 — Launch
-```bash
-./run.sh
-```
-Or find **Mint Scan** in your Linux apps menu.
+## Phone Companion — Two Methods
 
----
+### Method 1: USB (ADB)
+1. Phone → Settings → About → tap Build Number 7× → Developer Options → USB Debugging ON
+2. Plug USB cable into Linux machine
+3. Mint Scan → USB Sync → tap ↺ RESCAN
+4. Tap ALLOW on phone popup
+5. Use the sync buttons to pull calls, SMS, contacts, screenshots
 
-## Install on Ubuntu / Debian / Kali
+### Method 2: Wi-Fi (No cable)
+1. Mint Scan → Wireless tab → tap START SERVER
+2. Note the IP:Port shown (e.g. 192.168.1.100:7777)
+3. On phone browser: open http://192.168.1.100:7777
+4. Companion app loads — use Sync tab to send data to desktop
 
-```bash
-git clone https://github.com/mintpro004/mint-scan-linux.git
-cd mint-scan-linux
-chmod +x install.sh
-./install.sh
-./run.sh
-```
+## Requirements
+- Ubuntu 20.04+, Kali Linux, Linux Mint, ChromeOS (Linux), WSL2
+- Python 3.9+
+- python3-tk (auto-installed by install.sh)
 
----
-
-## Manual install (without install.sh)
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python3 main.py
-```
-
----
-
-## Android Phone Integration (KDE Connect)
-
-To get your phone's calls, SMS and WhatsApp notifications on your Linux desktop:
-
-```bash
-sudo apt install kdeconnect
-```
-
-Then:
-1. Install **KDE Connect** on your Android phone (Play Store)
-2. Open KDE Connect on both devices — they must be on the same Wi-Fi
-3. Pair them — your phone's calls, notifications and files will mirror to Linux
-
----
-
-## Permissions & sudo
-
-Some features need elevated access:
-- **Wi-Fi scan**: Works without sudo via `nmcli` (NetworkManager must be running)
-- **Port scan**: `nmap` works faster with sudo but also works without
-- **SSH config check**: Needs sudo to read `/etc/ssh/sshd_config`
-- **Battery**: Reads directly from `/sys/class/power_supply/` — no sudo needed
-
----
-
-## Dependencies
-
-Installed automatically by `install.sh`:
-- `python3`, `python3-tk`, `python3-pip`
-- `nmcli` (NetworkManager)
-- `iw`, `wireless-tools`
-- `nmap`
-- `dbus` (notifications)
-- Python packages: `customtkinter`, `psutil`, `netifaces`, `requests`, `speedtest-cli`
-
----
-
-Mint Projects © 2025 — Pretoria, South Africa
-
----
-
-## Push to GitHub (first time)
-
-After creating the repo at github.com/mintpro004/mint-scan-linux:
-
-```bash
-cd mint-scan-linux
-git init
-git add .
-git commit -m "Mint Scan v6 — Initial release"
-git branch -M main
-git remote add origin https://github.com/mintpro004/mint-scan-linux.git
-git push -u origin main
-```
+## v7 Fixes (this release)
+- Fixed: 7 screen modules importing C/MONO/MONO_SM from wrong module (utils → widgets)
+- Fixed: Wireless tab missing from ALL_TABS and screen_map in app.py
+- Fixed: companion_app.html completely rebuilt — was a static placeholder, now fully functional
+- Fixed: /sync/network and /sync/location endpoints missing from wireless server
+- Fixed: ADB udev rules not written during install (phone not detected)
+- Fixed: run.sh now smarter self-healer
+- Added: Wireless tab registered as full screen in navigation

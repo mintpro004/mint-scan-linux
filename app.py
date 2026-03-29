@@ -31,6 +31,7 @@ ALL_TABS = [
     ('notifs',      'Notifs',       '🔔'),
     ('ports',       'Port Scan',    '🔍'),
     ('usb',         'USB Sync',     '📱'),
+    ('wireless',    'Wireless',     '📶'),
     ('netscan',     'Net Scan',     '🔬'),
     ('malware',     'Malware',      '🦠'),
     ('sysfix',      'Sys Fix',      '🔧'),
@@ -198,6 +199,7 @@ class MintScanApp:
             'ports':       _safe('ports',       'PortsScreen'),
             'usb':         _safe('usb',         'UsbScreen'),
             'apk':         _safe('usb',          'ApkScreen'),
+            'wireless':    _safe('wireless',     'WirelessScreen'),
             'netscan':     _safe('netscan',     'NetScanScreen'),
             'malware':     _safe('malware',     'MalwareScreen'),
             'sysfix':      _safe('sysfix',      'SysFixScreen'),
@@ -278,7 +280,7 @@ class MintScanApp:
         import importlib
         import widgets
         import dash, perms, wifi, calls, network, battery, threats, notifs
-        import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, auditor, guardian, settings
+        import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, auditor, guardian, settings, wireless
         
         # Force reload of modules that use fonts/colors
         importlib.reload(widgets)
@@ -293,6 +295,7 @@ class MintScanApp:
         importlib.reload(notifs)
         importlib.reload(ports)
         importlib.reload(usb)
+        importlib.reload(wireless)
         importlib.reload(netscan)
         importlib.reload(malware)
         importlib.reload(sysfix)
@@ -330,6 +333,7 @@ class MintScanApp:
             'ports':       ports.PortsScreen,
             'usb':         usb.UsbScreen,
             'apk':         usb.ApkScreen, # alias
+            'wireless':    wireless.WirelessScreen,
             'netscan':     netscan.NetScanScreen,
             'malware':     malware.MalwareScreen,
             'sysfix':      sysfix.SysFixScreen,

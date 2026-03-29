@@ -2,259 +2,318 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mint Scan Companion v7</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mint Scan Companion</title>
     <style>
         :root {
             --bg: #020c14; --sf: #061523; --s2: #0a1e2e;
-            --br: #0d2a3d; --ac: #00ffe0; --tx: #c8e8f4;
-            --mu: #3a6278; --ok: #39ff88; --wn: #ff4c4c;
+            --br: #0d2a3d; --br2: #1a3a52; --ac: #00ffe0;
+            --ok: #39ff88; --wn: #ff4c4c; --am: #ffb830;
+            --bl: #4d9fff; --tx: #c8e8f4; --mu: #3a6278;
         }
-        body {
-            background: var(--bg); color: var(--tx);
-            font-family: 'Courier New', monospace; margin: 0; padding: 0;
-            display: flex; flex-direction: column; height: 100vh;
-        }
-        header {
-            background: var(--sf); padding: 15px; text-align: center;
-            border-bottom: 2px solid var(--br);
-        }
-        h1 { color: var(--ac); margin: 0; font-size: 20px; letter-spacing: 2px; }
-        
-        .tabs { display: flex; background: var(--s2); border-bottom: 1px solid var(--br); }
-        .tab { 
-            flex: 1; padding: 12px; text-align: center; font-size: 12px; 
-            color: var(--mu); cursor: pointer; border-bottom: 2px solid transparent;
-        }
-        .tab.active { color: var(--ac); border-bottom-color: var(--ac); font-weight: bold; }
-        
-        .content { flex: 1; overflow-y: auto; padding: 15px; }
-        .page { display: none; }
-        .page.active { display: block; }
-        
-        .card { 
-            background: var(--sf); border: 1px solid var(--br); 
-            border-radius: 8px; padding: 15px; margin-bottom: 15px;
-        }
-        .label { color: var(--mu); font-size: 10px; text-transform: uppercase; margin-bottom: 4px; }
-        .value { font-size: 16px; margin-bottom: 10px; color: #fff; }
-        
-        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-        .status-ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-        
-        .btn {
-            display: block; width: 100%; padding: 12px; margin-top: 10px;
-            background: transparent; border: 1px solid var(--ac); color: var(--ac);
-            text-align: center; border-radius: 4px; font-weight: bold; cursor: pointer;
-        }
-        .btn:active { background: rgba(0, 255, 224, 0.1); }
-        
-        .sync-status { font-size: 10px; text-align: center; margin-top: 10px; color: var(--mu); }
-        #log { font-size: 9px; color: var(--mu); margin-top: 10px; height: 60px; overflow-y: auto; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--tx); font-family: 'Courier New', monospace; min-height: 100vh; padding: 12px; }
+        .header { background: var(--sf); border: 1px solid var(--br); border-radius: 8px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .logo { color: var(--ac); font-size: 18px; font-weight: bold; }
+        .logo span { font-size: 10px; color: var(--mu); display: block; }
+        .live-dot { color: var(--ok); font-size: 10px; animation: blink 1s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+        .section { background: var(--sf); border: 1px solid var(--br); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+        .section-hdr { background: var(--s2); padding: 8px 14px; font-size: 9px; color: var(--ac); font-weight: bold; letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center; }
+        .section-body { padding: 12px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .cell { background: var(--bg); border: 1px solid var(--br); border-radius: 6px; padding: 8px 10px; }
+        .cell-lbl { font-size: 8px; color: var(--mu); margin-bottom: 3px; }
+        .cell-val { font-size: 11px; color: var(--tx); word-break: break-all; }
+        .cell-val.ok { color: var(--ok); } .cell-val.warn { color: var(--wn); } .cell-val.am { color: var(--am); } .cell-val.ac { color: var(--ac); }
+        .btn { background: transparent; border: 1px solid var(--ac); color: var(--ac); padding: 10px 16px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; transition: background 0.2s; }
+        .btn:active { background: var(--br); } .btn.danger { border-color: var(--wn); color: var(--wn); } .btn.ghost { border-color: var(--mu); color: var(--mu); } .btn.ok { border-color: var(--ok); color: var(--ok); }
+        .log-box { background: var(--bg); border: 1px solid var(--br); border-radius: 4px; padding: 8px; font-size: 9px; color: var(--ok); max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; margin-top: 8px; }
+        .server-url { background: var(--bg); border: 1px solid var(--ac); border-radius: 4px; padding: 10px; text-align: center; color: var(--ac); font-size: 13px; font-weight: bold; margin: 8px 0; }
+        .progress-wrap { background: var(--br); border-radius: 2px; height: 4px; margin-top: 6px; }
+        .progress-bar { height: 4px; border-radius: 2px; background: var(--ac); transition: width 0.3s; }
+        input[type="text"] { background: var(--bg); border: 1px solid var(--br); color: var(--tx); font-family: 'Courier New', monospace; padding: 8px; border-radius: 4px; width: 100%; font-size: 11px; margin-top: 6px; }
+        input:focus { outline: none; border-color: var(--ac); }
+        .tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+        .tab { background: var(--sf); border: 1px solid var(--br); color: var(--mu); padding: 7px 12px; border-radius: 4px; font-size: 9px; cursor: pointer; font-family: 'Courier New', monospace; }
+        .tab.active { border-color: var(--ac); color: var(--ac); background: var(--s2); }
+        .panel { display: none; } .panel.active { display: block; }
+        #server-status { font-size: 9px; color: var(--mu); margin-top: 6px; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .btn-grid .btn { margin-top: 0; }
     </style>
 </head>
 <body>
 
-<header>
-    <h1>[ MINT SCAN ]</h1>
-    <div style="font-size: 10px; color: var(--mu); margin-top: 4px;">COMPANION v7.0</div>
-</header>
-
-<div class="tabs">
-    <div class="tab active" onclick="showPage('sys')">SYSTEM</div>
-    <div class="tab" onclick="showPage('net')">NETWORK</div>
-    <div class="tab" onclick="showPage('sync')">SYNC</div>
+<div class="header">
+    <div>
+        <div class="logo">[ MINT SCAN ] <span>COMPANION v7  •  MINT PROJECTS</span></div>
+    </div>
+    <span class="live-dot">● LIVE</span>
 </div>
 
-<div class="content">
-    <!-- SYSTEM PAGE -->
-    <div id="page-sys" class="page active">
-        <div class="card">
-            <div class="label">Device Info</div>
-            <div class="value" id="val-device">Loading...</div>
-            <div class="label">Platform</div>
-            <div class="value" id="val-plat">—</div>
-            <div class="label">CPU Cores</div>
-            <div class="value" id="val-cores">—</div>
-        </div>
-        <div class="card">
-            <div class="label">Battery Status</div>
-            <div id="bat-status" class="value"><span class="status-dot"></span> —</div>
-            <div id="bat-bar-bg" style="background: var(--br); height: 8px; border-radius: 4px;">
-                <div id="bat-bar" style="background: var(--ok); height: 100%; width: 0%; border-radius: 4px; transition: width 0.5s;"></div>
+<div class="tabs">
+    <div class="tab active" onclick="showTab('device',this)">📱 Device</div>
+    <div class="tab" onclick="showTab('sync',this)">🔄 Sync</div>
+    <div class="tab" onclick="showTab('network',this)">📡 Network</div>
+    <div class="tab" onclick="showTab('connect',this)">🔗 Connect</div>
+</div>
+
+<div id="tab-device" class="panel active">
+    <div class="section">
+        <div class="section-hdr">DEVICE INFORMATION <span id="ts">Loading...</span></div>
+        <div class="section-body">
+            <div class="grid">
+                <div class="cell"><div class="cell-lbl">STATUS</div><div class="cell-val ok">ONLINE</div></div>
+                <div class="cell"><div class="cell-lbl">PLATFORM</div><div class="cell-val" id="d-platform">—</div></div>
+                <div class="cell"><div class="cell-lbl">BROWSER</div><div class="cell-val" id="d-browser">—</div></div>
+                <div class="cell"><div class="cell-lbl">CPU CORES</div><div class="cell-val ac" id="d-cores">—</div></div>
+                <div class="cell"><div class="cell-lbl">MEMORY</div><div class="cell-val" id="d-mem">—</div></div>
+                <div class="cell"><div class="cell-lbl">SCREEN</div><div class="cell-val" id="d-screen">—</div></div>
+                <div class="cell"><div class="cell-lbl">LANGUAGE</div><div class="cell-val" id="d-lang">—</div></div>
+                <div class="cell"><div class="cell-lbl">TIMEZONE</div><div class="cell-val" id="d-tz">—</div></div>
             </div>
+            <button class="btn" onclick="refreshDevice()">⟳ REFRESH DEVICE INFO</button>
         </div>
     </div>
-
-    <!-- NETWORK PAGE -->
-    <div id="page-net" class="page">
-        <div class="card">
-            <div class="label">Connection Type</div>
-            <div class="value" id="val-net-type">Detecting...</div>
-            <div class="label">Downlink Speed</div>
-            <div class="value" id="val-net-speed">—</div>
-            <div class="label">Round Trip Time (RTT)</div>
-            <div class="value" id="val-net-rtt">—</div>
-        </div>
-        <div class="card">
-            <div class="label">Location (GPS/IP)</div>
-            <div class="value" id="val-loc">Not Requested</div>
-            <button class="btn" onclick="requestLocation()" style="font-size: 10px; padding: 6px;">REQUEST PERMISSION</button>
+    <div class="section">
+        <div class="section-hdr">BATTERY STATUS</div>
+        <div class="section-body">
+            <div class="grid">
+                <div class="cell"><div class="cell-lbl">LEVEL</div><div class="cell-val ok" id="b-level">—</div></div>
+                <div class="cell"><div class="cell-lbl">CHARGING</div><div class="cell-val" id="b-charging">—</div></div>
+                <div class="cell"><div class="cell-lbl">CHARGE TIME</div><div class="cell-val" id="b-chgtime">—</div></div>
+                <div class="cell"><div class="cell-lbl">DISCHARGE TIME</div><div class="cell-val" id="b-dischtime">—</div></div>
+            </div>
+            <div class="progress-wrap" style="margin-top:10px"><div class="progress-bar" id="b-bar" style="width:0%"></div></div>
         </div>
     </div>
+</div>
 
-    <!-- SYNC PAGE -->
-    <div id="page-sync" class="page">
-        <div class="card">
-            <div class="label">Desktop Server URL</div>
-            <input type="text" id="server-url" placeholder="http://192.168.1.x:8080" 
-                   style="width: 100%; background: var(--bg); border: 1px solid var(--br); color: var(--ac); padding: 8px; box-sizing: border-box; margin-bottom: 10px;">
-            <div class="label">Sync Status</div>
-            <div id="sync-status-val" class="value">Idle</div>
-            <button class="btn" id="btn-sync" onclick="toggleSync()">▶ START AUTO-SYNC</button>
+<div id="tab-sync" class="panel">
+    <div class="section">
+        <div class="section-hdr">SEND DATA TO DESKTOP</div>
+        <div class="section-body">
+            <p style="font-size:9px;color:var(--mu);margin-bottom:8px">Enter your desktop IP (shown in Mint Scan USB Sync tab). Port: 7777</p>
+            <div class="cell-lbl">DESKTOP IP ADDRESS</div>
+            <input type="text" id="server-ip" placeholder="192.168.1.100">
+            <div id="server-status">Not connected</div>
+            <button class="btn ok" onclick="testConnection()">🔗 TEST CONNECTION</button>
+            <div class="btn-grid">
+                <button class="btn" onclick="syncDevice()">📱 Device Info</button>
+                <button class="btn" onclick="syncBattery()">🔋 Battery</button>
+                <button class="btn" onclick="syncNetwork()">📡 Network</button>
+                <button class="btn" onclick="syncLocation()">📍 Location</button>
+            </div>
+            <div class="log-box" id="sync-log">Waiting for sync...</div>
         </div>
-        <div id="log"></div>
+    </div>
+</div>
+
+<div id="tab-network" class="panel">
+    <div class="section">
+        <div class="section-hdr">NETWORK INFORMATION</div>
+        <div class="section-body">
+            <div class="grid">
+                <div class="cell"><div class="cell-lbl">ONLINE</div><div class="cell-val ok" id="n-online">—</div></div>
+                <div class="cell"><div class="cell-lbl">CONNECTION TYPE</div><div class="cell-val" id="n-type">—</div></div>
+                <div class="cell"><div class="cell-lbl">DOWNLINK</div><div class="cell-val ac" id="n-downlink">—</div></div>
+                <div class="cell"><div class="cell-lbl">RTT</div><div class="cell-val" id="n-rtt">—</div></div>
+                <div class="cell"><div class="cell-lbl">COOKIES</div><div class="cell-val" id="n-cookies">—</div></div>
+                <div class="cell"><div class="cell-lbl">DNT</div><div class="cell-val" id="n-dnt">—</div></div>
+            </div>
+            <button class="btn" onclick="refreshNetwork()">⟳ REFRESH NETWORK</button>
+        </div>
+    </div>
+    <div class="section">
+        <div class="section-hdr">SPEED TEST</div>
+        <div class="section-body">
+            <div class="grid">
+                <div class="cell"><div class="cell-lbl">DOWNLOAD</div><div class="cell-val ac" id="sp-dl">Tap test</div></div>
+                <div class="cell"><div class="cell-lbl">PING</div><div class="cell-val ok" id="sp-ping">Tap test</div></div>
+            </div>
+            <button class="btn" onclick="runSpeedTest()">⚡ RUN SPEED TEST</button>
+            <div class="progress-wrap"><div class="progress-bar" id="sp-bar" style="width:0%"></div></div>
+        </div>
+    </div>
+</div>
+
+<div id="tab-connect" class="panel">
+    <div class="section">
+        <div class="section-hdr">CONNECTION GUIDE</div>
+        <div class="section-body" style="font-size:9px; color:var(--mu); line-height:1.8">
+            <p style="color:var(--ac);font-weight:bold;margin-bottom:6px">METHOD 1 — USB (Recommended)</p>
+            <p>1. Enable USB Debugging: Settings → About Phone</p>
+            <p>   → tap Build Number 7 times → Developer Options → ON</p>
+            <p>2. Plug USB cable into Linux/Chromebook</p>
+            <p>3. Mint Scan → USB Sync → ↺ RESCAN</p>
+            <p>4. Tap ALLOW on the phone popup</p>
+            <p style="color:var(--ac);font-weight:bold;margin:12px 0 6px">METHOD 2 — Wi-Fi</p>
+            <p>1. Mint Scan → USB Sync → START WIRELESS SERVER</p>
+            <p>2. Note the IP shown (e.g. 192.168.1.100)</p>
+            <p>3. Go to Sync tab → enter the IP → TEST CONNECTION</p>
+            <div class="server-url" id="qr-url">[ COMPANION ACTIVE ]</div>
+            <p style="color:var(--ok);margin-top:8px">✓ Companion loaded successfully.</p>
+            <button class="btn ok" onclick="location.reload()" style="margin-top:12px">⟳ RELOAD</button>
+        </div>
     </div>
 </div>
 
 <script>
-    let syncInterval = null;
-    let syncData = { lat: null, lon: null, acc: null };
+function showTab(name, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    el.classList.add('active');
+}
 
-    function showPage(id) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.getElementById('page-' + id).classList.add('active');
-        event.target.classList.add('active');
-    }
+function refreshDevice() {
+    const ua = navigator.userAgent;
+    let browser = 'Unknown';
+    if (ua.includes('Chrome')) browser = 'Chrome ' + (ua.match(/Chrome\/([\d.]+)/) || ['','?'])[1];
+    else if (ua.includes('Firefox')) browser = 'Firefox';
+    else if (ua.includes('Safari')) browser = 'Safari';
+    let platform = navigator.platform || 'Unknown';
+    if (/Android/i.test(ua)) platform = 'Android';
+    else if (/iPhone|iPad/i.test(ua)) platform = 'iOS';
+    document.getElementById('d-platform').textContent = platform;
+    document.getElementById('d-browser').textContent = browser;
+    document.getElementById('d-cores').textContent = navigator.hardwareConcurrency || '—';
+    document.getElementById('d-mem').textContent = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '—';
+    document.getElementById('d-screen').textContent = screen.width + 'x' + screen.height;
+    document.getElementById('d-lang').textContent = navigator.language || '—';
+    document.getElementById('d-tz').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || '—';
+    document.getElementById('ts').textContent = new Date().toLocaleTimeString();
+}
 
-    function log(msg) {
-        const l = document.getElementById('log');
-        l.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}<br>${l.innerHTML}`;
-    }
-
-    // --- DATA COLLECTION ---
-    function updateStats() {
-        // System
-        document.getElementById('val-device').textContent = navigator.userAgent.split('(')[1].split(')')[0];
-        document.getElementById('val-plat').textContent = navigator.platform;
-        document.getElementById('val-cores').textContent = navigator.hardwareConcurrency + " Cores";
-        
-        // Battery
-        if (navigator.getBattery) {
-            navigator.getBattery().then(bat => {
-                const lvl = Math.round(bat.level * 100);
-                document.getElementById('bat-status').innerHTML = `<span class="status-dot ${lvl > 20 ? 'status-ok' : ''}" style="background:${lvl > 20 ? '' : 'var(--wn)'}"></span> ${lvl}% ${bat.charging ? '(Charging)' : ''}`;
-                document.getElementById('bat-bar').style.width = lvl + '%';
-                document.getElementById('bat-bar').style.background = lvl > 50 ? 'var(--ok)' : lvl > 20 ? '#ffb830' : 'var(--wn)';
-            });
+async function loadBattery() {
+    if (!navigator.getBattery) { document.getElementById('b-level').textContent = 'N/A'; return; }
+    try {
+        const bat = await navigator.getBattery();
+        function update() {
+            const pct = Math.round(bat.level * 100);
+            const lv = document.getElementById('b-level');
+            lv.textContent = pct + '%';
+            lv.className = 'cell-val ' + (pct > 50 ? 'ok' : pct > 20 ? 'am' : 'warn');
+            document.getElementById('b-charging').textContent = bat.charging ? 'YES ⚡' : 'No';
+            document.getElementById('b-charging').className = 'cell-val ' + (bat.charging ? 'ok' : 'tx');
+            document.getElementById('b-chgtime').textContent = bat.chargingTime === Infinity ? '—' : Math.round(bat.chargingTime/60) + ' min';
+            document.getElementById('b-dischtime').textContent = bat.dischargingTime === Infinity ? '—' : Math.round(bat.dischargingTime/60) + ' min';
+            document.getElementById('b-bar').style.width = pct + '%';
+            document.getElementById('b-bar').style.background = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--am)' : 'var(--wn)';
         }
+        update();
+        bat.addEventListener('levelchange', update);
+        bat.addEventListener('chargingchange', update);
+    } catch(e) { document.getElementById('b-level').textContent = 'Error'; }
+}
 
-        // Network
-        if (navigator.connection) {
-            const conn = navigator.connection;
-            document.getElementById('val-net-type').textContent = conn.type || conn.effectiveType || 'Unknown';
-            document.getElementById('val-net-speed').textContent = conn.downlink + " Mbps";
-            document.getElementById('val-net-rtt').textContent = conn.rtt + " ms";
-        }
+function refreshNetwork() {
+    document.getElementById('n-online').textContent = navigator.onLine ? 'YES' : 'NO';
+    document.getElementById('n-online').className = 'cell-val ' + (navigator.onLine ? 'ok' : 'warn');
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) {
+        document.getElementById('n-type').textContent = conn.effectiveType || conn.type || '—';
+        document.getElementById('n-downlink').textContent = conn.downlink ? conn.downlink + ' Mbps' : '—';
+        document.getElementById('n-rtt').textContent = conn.rtt ? conn.rtt + ' ms' : '—';
     }
+    document.getElementById('n-cookies').textContent = navigator.cookieEnabled ? 'YES' : 'NO';
+    document.getElementById('n-dnt').textContent = navigator.doNotTrack === '1' ? 'ON' : 'OFF';
+}
 
-    function requestLocation() {
-        if (!navigator.geolocation) return log("GPS not supported");
-        log("Requesting GPS...");
-        navigator.geolocation.getCurrentPosition(pos => {
-            syncData.lat = pos.coords.latitude;
-            syncData.lon = pos.coords.longitude;
-            syncData.acc = pos.coords.accuracy;
-            document.getElementById('val-loc').textContent = `${syncData.lat.toFixed(4)}, ${syncData.lon.toFixed(4)} (±${Math.round(syncData.acc)}m)`;
-            log("GPS updated");
-        }, err => log("GPS Error: " + err.message));
+async function runSpeedTest() {
+    document.getElementById('sp-dl').textContent = 'Testing...';
+    document.getElementById('sp-ping').textContent = 'Testing...';
+    document.getElementById('sp-bar').style.width = '10%';
+    try {
+        const t0 = performance.now();
+        await fetch('https://www.google.com/favicon.ico?t=' + Date.now(), {mode:'no-cors',cache:'no-store'});
+        const ping = Math.round(performance.now() - t0);
+        document.getElementById('sp-ping').textContent = ping + ' ms';
+        document.getElementById('sp-ping').className = 'cell-val ' + (ping < 50 ? 'ok' : ping < 150 ? 'am' : 'warn');
+    } catch(e) { document.getElementById('sp-ping').textContent = 'Failed'; }
+    document.getElementById('sp-bar').style.width = '50%';
+    try {
+        const dt0 = performance.now();
+        const r = await fetch('https://www.cloudflare.com/cdn-cgi/trace?' + Date.now(), {cache:'no-store'});
+        const txt = await r.text();
+        const secs = (performance.now() - dt0) / 1000;
+        const bits = txt.length * 8;
+        const mbps = (bits / secs / 1e6).toFixed(2);
+        document.getElementById('sp-dl').textContent = mbps + ' Mbps (est.)';
+    } catch(e) { document.getElementById('sp-dl').textContent = 'Limited'; }
+    document.getElementById('sp-bar').style.width = '100%';
+}
+
+function syncLog(msg) {
+    const log = document.getElementById('sync-log');
+    const ts = new Date().toLocaleTimeString();
+    log.textContent = '[' + ts + '] ' + msg + '\n' + log.textContent.substring(0, 400);
+}
+
+function getServerUrl() {
+    const ip = document.getElementById('server-ip').value.trim();
+    if (!ip) { syncLog('Enter desktop IP address first'); return null; }
+    return 'http://' + ip + ':7777';
+}
+
+async function testConnection() {
+    const url = getServerUrl(); if (!url) return;
+    document.getElementById('server-status').textContent = 'Connecting...';
+    try {
+        const r = await fetch(url + '/status', {signal: AbortSignal.timeout(5000)});
+        const d = await r.json();
+        document.getElementById('server-status').textContent = 'Connected: ' + d.name;
+        document.getElementById('server-status').style.color = 'var(--ok)';
+        syncLog('Connected to ' + d.name);
+    } catch(e) {
+        document.getElementById('server-status').textContent = 'Failed: ' + e.message;
+        document.getElementById('server-status').style.color = 'var(--wn)';
+        syncLog('Failed: ' + e.message);
     }
+}
 
-    // --- SYNC ENGINE ---
-    async function postSync(path, data) {
-        const baseUrl = document.getElementById('server-url').value.trim();
-        if (!baseUrl) return;
-        try {
-            const res = await fetch(baseUrl + path, {
-                method: 'POST',
-                mode: 'cors',
-                body: JSON.stringify(data),
-                headers: { 'Content-Type': 'application/json' }
-            });
-            return res.ok;
-        } catch (e) {
-            return false;
-        }
-    }
+async function postSync(ep, data) {
+    const url = getServerUrl(); if (!url) return false;
+    try {
+        await fetch(url + ep, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data), signal: AbortSignal.timeout(8000)});
+        return true;
+    } catch(e) { syncLog('Send failed: ' + e.message); return false; }
+}
 
-    async function performSync() {
-        const url = document.getElementById('server-url').value;
-        if (!url) return;
+async function syncDevice() {
+    syncLog('Syncing device info...');
+    const ok = await postSync('/sync/device', {platform:navigator.platform, userAgent:navigator.userAgent, cores:navigator.hardwareConcurrency, memory:navigator.deviceMemory, screen:screen.width+'x'+screen.height, language:navigator.language, timezone:Intl.DateTimeFormat().resolvedOptions().timeZone, timestamp:new Date().toISOString()});
+    syncLog(ok ? 'Device info sent' : 'Failed');
+}
 
-        log("Syncing...");
-        
-        // 1. Device Info
-        await postSync('/sync/device', {
-            platform: navigator.platform,
-            browser: navigator.userAgent,
-            cores: navigator.hardwareConcurrency,
-            memory: navigator.deviceMemory
-        });
+async function syncBattery() {
+    if (!navigator.getBattery) { syncLog('Battery API not available'); return; }
+    const bat = await navigator.getBattery();
+    const ok = await postSync('/sync/battery', {level:Math.round(bat.level*100), charging:bat.charging, chargingTime:bat.chargingTime, dischargingTime:bat.dischargingTime, timestamp:new Date().toISOString()});
+    syncLog(ok ? 'Battery data sent' : 'Failed');
+}
 
-        // 2. Battery
-        if (navigator.getBattery) {
-            const bat = await navigator.getBattery();
-            await postSync('/sync/battery', {
-                level: Math.round(bat.level * 100),
-                charging: bat.charging
-            });
-        }
+async function syncNetwork() {
+    const conn = navigator.connection || {};
+    const ok = await postSync('/sync/network', {online:navigator.onLine, type:conn.effectiveType||conn.type||'unknown', downlink:conn.downlink, rtt:conn.rtt, timestamp:new Date().toISOString()});
+    syncLog(ok ? 'Network info sent' : 'Failed');
+}
 
-        // 3. Network
-        if (navigator.connection) {
-            await postSync('/sync/network', {
-                type: navigator.connection.effectiveType,
-                downlink: navigator.connection.downlink,
-                rtt: navigator.connection.rtt
-            });
-        }
+async function syncLocation() {
+    syncLog('Requesting location permission...');
+    if (!navigator.geolocation) { syncLog('Location not available'); return; }
+    navigator.geolocation.getCurrentPosition(async pos => {
+        const ok = await postSync('/sync/location', {latitude:pos.coords.latitude, longitude:pos.coords.longitude, accuracy:pos.coords.accuracy, timestamp:new Date().toISOString()});
+        syncLog(ok ? 'Location sent (±' + Math.round(pos.coords.accuracy) + 'm)' : 'Failed');
+    }, err => syncLog('Denied: ' + err.message));
+}
 
-        // 4. Location
-        if (syncData.lat) {
-            await postSync('/sync/location', syncData);
-        }
-
-        document.getElementById('sync-status-val').textContent = "Last Sync: " + new Date().toLocaleTimeString();
-    }
-
-    function toggleSync() {
-        const btn = document.getElementById('btn-sync');
-        if (syncInterval) {
-            clearInterval(syncInterval);
-            syncInterval = null;
-            btn.textContent = "▶ START AUTO-SYNC";
-            btn.style.borderColor = "var(--ac)";
-            log("Sync stopped");
-        } else {
-            const url = document.getElementById('server-url').value;
-            if (!url) return alert("Enter Server URL first!");
-            performSync();
-            syncInterval = setInterval(performSync, 5000);
-            btn.textContent = "⏹ STOP AUTO-SYNC";
-            btn.style.borderColor = "var(--wn)";
-            log("Sync started (5s interval)");
-        }
-    }
-
-    // Init
-    setInterval(updateStats, 2000);
-    updateStats();
-    
-    // Auto-fill server URL if in query string (for easy setup)
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('s')) document.getElementById('server-url').value = params.get('s');
-
+refreshDevice();
+refreshNetwork();
+loadBattery();
+document.getElementById('qr-url').textContent = location.origin || '[ FILE LOADED ]';
+setInterval(() => document.getElementById('ts').textContent = new Date().toLocaleTimeString(), 1000);
 </script>
 </body>
 </html>

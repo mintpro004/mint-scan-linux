@@ -1,12 +1,12 @@
 """Dashboard Screen — real system info"""
+from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL, ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 import tkinter as tk
 import customtkinter as ctk
 import threading
 import platform
 import socket
-from utils import C, MONO, MONO_SM, MONO_LG, MONO_XL, get_system_info, get_public_ip_info, get_local_ip, get_battery_info
+from utils import get_system_info, get_public_ip_info, get_local_ip, get_battery_info
 from installer import install_all_tools
-from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn
 
 
 class DashScreen(ctk.CTkFrame):

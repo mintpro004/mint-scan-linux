@@ -1,9 +1,9 @@
 """Port Scanner Screen — real local + remote port scanning"""
+from widgets import C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader, ResultBox, Btn, PortBar
 import tkinter as tk
 import customtkinter as ctk
 import threading, socket, re
-from utils import C, MONO, MONO_SM, run_cmd, get_open_ports, get_active_connections
-from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn, PortBar
+from utils import run_cmd, get_open_ports, get_active_connections
 
 
 WELL_KNOWN = {

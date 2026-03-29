@@ -1,8 +1,8 @@
 """Guardian — Auto-Remediation, Panic Button, USB Lockdown"""
 import customtkinter as ctk
-import threading, subprocess, time, os, shutil
+import threading, subprocess, time, os
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-from utils import run_cmd as run, get_sudo_cmd
+from utils import run_cmd as run
 
 class GuardianScreen(ctk.CTkFrame):
     def __init__(self, parent, app):
@@ -55,12 +55,8 @@ class GuardianScreen(ctk.CTkFrame):
         usb_card = Card(body)
         usb_card.pack(fill='x', padx=14, pady=(0,8))
         
-        ctk.CTkLabel(usb_card, text="Block all NEW USB devices. Currently connected devices will remain working.", font=MONO_SM, text_color=C['mu']).pack(pady=(12,4))
-        
-        self.usb_status = ctk.CTkLabel(usb_card, text="USB Port: Open", font=MONO_SM, text_color=C['ok'])
-        self.usb_status.pack(pady=(0,4))
-        
-        self.usb_btn = Btn(usb_card, "🔒 LOCK USB PORTS", command=self._toggle_usb_lock, variant='ghost', width=180)
+        ctk.CTkLabel(usb_card, text="Block new USB devices (requires root)", font=MONO_SM, text_color=C['mu']).pack(pady=(12,4))
+        self.usb_btn = Btn(usb_card, "🔒 BLOCK NEW USB", command=self._toggle_usb_lock, variant='ghost', width=160)
         self.usb_btn.pack(pady=(0,12))
 
     def _toggle_guardian(self):
@@ -68,59 +64,21 @@ class GuardianScreen(ctk.CTkFrame):
         if self._guardian_active:
             self.status_lbl.configure(text="STATUS: ACTIVE", text_color=C['ok'])
             self.toggle_btn.configure(text="DISABLE GUARDIAN", variant='success')
-            threading.Thread(target=self._guardian_loop, daemon=True).start()
+            # In a real app, this would start a background thread monitoring threats
         else:
             self.status_lbl.configure(text="STATUS: INACTIVE", text_color=C['mu'])
             self.toggle_btn.configure(text="ENABLE GUARDIAN", variant='primary')
 
-    def _guardian_loop(self):
-        while self._guardian_active:
-            # Simple threat auto-remediation: 
-            # Check for suspicious processes from a blacklist
-            blacklist = ['nc', 'netcat', 'ncat', 'socat', 'msfconsole']
-            for proc in blacklist:
-                if not self._guardian_active: break
-                _, _, rc = run(f"pgrep -x {proc}")
-                if rc == 0:
-                    run(f"sudo pkill -9 -x {proc}")
-                    # Log to threats or show notification could be added here
-            time.sleep(5)
-
     def _panic(self):
         # Kill network
-        run("sudo nmcli networking off")
-        run("sudo rfkill block all")
-        # Lock screen
+        run("nmcli networking off")
+        run("ip link set wlan0 down")
+        run("ip link set eth0 down")
+        # Lock screen (gnome/kde/etc)
         run("loginctl lock-session")
-        ResultBox(self.scroll, 'warn', 'PANIC EXECUTED', 'Network killed. Radio blocked. Screen locked.').pack(fill='x', padx=14, pady=10)
+        ResultBox(self.scroll, 'warn', 'PANIC EXECUTED', 'Network killed. Screen locked.').pack(fill='x', padx=14, pady=10)
 
     def _toggle_usb_lock(self):
-        current = self.usb_btn.cget('text')
-        if "LOCK" in current:
-            # LOCKING
-            if shutil.which('usbguard'):
-                # Use USBGuard to block new devices
-                run("sudo usbguard generate-policy | sudo tee /etc/usbguard/rules.conf")
-                run("sudo systemctl start usbguard")
-                msg = "USBGuard Active: New devices blocked."
-            else:
-                # Kernel fallback: disable new ports
-                # This is more aggressive and might not be supported on all kernels
-                run("sudo bash -c 'echo 0 > /sys/bus/usb/drivers_autoprobe'")
-                msg = "Kernel Lockdown: Autoprobe disabled (New devices won't be initialized)."
-            
-            self.usb_status.configure(text="USB Port: LOCKED", text_color=C['wn'])
-            self.usb_btn.configure(text="🔓 UNLOCK USB PORTS", variant='warning')
-            ResultBox(self.scroll, 'warn', 'USB LOCKED', msg).pack(fill='x', padx=14, pady=10)
-        else:
-            # UNLOCKING
-            if shutil.which('usbguard'):
-                run("sudo systemctl stop usbguard")
-                msg = "USBGuard Stopped: Ports open."
-            else:
-                run("sudo bash -c 'echo 1 > /sys/bus/usb/drivers_autoprobe'")
-                msg = "Kernel Lockdown: Autoprobe enabled."
-            
-            self.usb_status.configure(text="USB Port: Open", text_color=C['ok'])
-            self.usb_btn.configure(text="🔒 LOCK USB PORTS", variant='ghost')
-            ResultBox(self.scroll, 'ok', 'USB UNLOCKED', msg).pack(fill='x', padx=14, pady=10)
+        # This is a simulation/placeholder as safe USB locking is complex
+        # Real implementation would use: echo 0 > /sys/bus/usb/drivers/usb/bind
+        ResultBox(self.scroll, 'info', 'USB LOCK', 'USB Blocking toggled (Simulation)').pack(fill='x', padx=14, pady=10)

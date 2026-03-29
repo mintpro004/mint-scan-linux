@@ -9,52 +9,33 @@ import time
 import shutil
 
 # Import colours and fonts from widgets (single source of truth)
-# Use a try-except to avoid circular or missing import issues
-try:
-    from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
-except ImportError:
-    # Fallback if widgets not yet available
-    C = {'bg': '#020c14', 'sf': '#061523', 'ac': '#00ffe0', 'wn': '#ff4c4c', 'ok': '#39ff88', 'mu': '#3a6278', 'br': '#0d2a3d'}
-    MONO = ('Courier', 10)
-    MONO_SM = ('Courier', 9)
+from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
+
 
 _pkexec_warned = False
-_has_display = os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')
-
-def get_sudo_cmd(cmd):
-    """
-    Translate a sudo command into a pkexec command if appropriate for GUI.
-    Returns the modified command string.
-    """
-    global _has_display
-    if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
-        has_pkexec = shutil.which('pkexec')
-        if has_pkexec and _has_display:
-            inner = cmd.strip()[5:]
-            inner_quoted = inner.replace("'", "'\\''")
-            return f"pkexec bash -c '{inner_quoted}'"
-    return cmd
-
 
 def run_cmd(cmd, timeout=8):
     """Run a shell command safely, using pkexec for sudo if needed."""
     global _pkexec_warned
-    
-    original_cmd = cmd
-    cmd = get_sudo_cmd(cmd)
+    # Handle sudo via pkexec for GUI apps if pkexec exists
+    if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
+        has_pkexec = shutil.which('pkexec')
+        if has_pkexec:
+            inner = cmd.strip()[5:]
+            inner_quoted = inner.replace("'", "'\\''")
+            cmd = f"pkexec bash -c '{inner_quoted}'"
+        else:
+            # Fallback to direct sudo (might fail if non-interactive)
+            if not _pkexec_warned:
+                # We could log this to a file instead of stderr to avoid user worry
+                # but for now, we just stay silent and let sudo handle it.
+                _pkexec_warned = True
+            pass
 
     try:
         r = subprocess.run(
             cmd, shell=True, capture_output=True, text=True, timeout=timeout
         )
-        # If pkexec failed (e.g. user cancelled or no agent), it might return 126 or 127
-        if r.returncode in [126, 127] and 'pkexec' in cmd:
-            # Fallback to direct sudo
-            r2 = subprocess.run(
-                original_cmd, shell=True, capture_output=True, text=True, timeout=timeout
-            )
-            return r2.stdout.strip(), r2.stderr.strip(), r2.returncode
-            
         return r.stdout.strip(), r.stderr.strip(), r.returncode
     except subprocess.TimeoutExpired:
         return '', 'timeout', 1
@@ -67,11 +48,9 @@ def get_public_ip_info():
     import requests
     try:
         r = requests.get('https://ipapi.co/json/', timeout=6)
-        if r.status_code == 200:
-            return r.json()
+        return r.json()
     except Exception:
-        pass
-    return {}
+        return {}
 
 
 def get_local_ip():
@@ -111,13 +90,12 @@ def copy_to_clipboard(text):
         root.withdraw()
         root.clipboard_clear()
         root.clipboard_append(text)
-        root.update()
+        root.update() # now it stays on the clipboard
         root.destroy()
         return True
     except Exception:
         try:
-            # Use printf to avoid issues with special characters in echo
-            subprocess.run(['xclip', '-selection', 'clipboard'], input=text.encode(), timeout=2)
+            subprocess.run(f"echo -n '{text}' | xclip -selection clipboard", shell=True, timeout=2)
             return True
         except Exception:
             return False
@@ -150,22 +128,15 @@ def get_wifi_networks():
                 continue
             parts = line.split(':')
             if len(parts) >= 5:
-                # SSID might contain colons, BSSID definitely does. nmcli -t uses : as separator.
-                # BSSID is 6 hex pairs.
                 ssid     = parts[0] if parts[0] else '(hidden)'
-                # Re-join BSSID if it was split
-                bssid = ":".join(parts[1:7]) if len(parts) >= 7 else parts[1]
-                
+                bssid    = ':'.join(parts[1:7]) if len(parts) >= 7 else parts[1]
                 try:
-                    # Signal is usually the 3rd last element in nmcli -t output for these fields
-                    signal = int(parts[-4])
-                except (ValueError, IndexError):
+                    signal = int(parts[-4]) if len(parts) >= 5 else 0
+                except ValueError:
                     signal = 0
-                    
                 security = parts[-3] if len(parts) >= 4 else 'OPEN'
                 channel  = parts[-2] if len(parts) >= 3 else '—'
                 freq     = parts[-1] if len(parts) >= 2 else '—'
-                
                 networks.append({
                     'ssid':     ssid,
                     'bssid':    bssid,
@@ -271,9 +242,7 @@ def get_battery_info():
     for name in os.listdir(base):
         path = os.path.join(base, name)
         try:
-            ptype_path = os.path.join(path, 'type')
-            if not os.path.exists(ptype_path): continue
-            ptype = open(ptype_path).read().strip()
+            ptype = open(os.path.join(path, 'type')).read().strip()
             if ptype == 'Battery':
                 def r(f):
                     fp = os.path.join(path, f)
@@ -315,9 +284,8 @@ def get_system_info():
     info['kernel']   = run_cmd('uname -r')[0]
 
     # CPU
-    cpu_out = run_cmd("grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2")[0].strip()
-    info['cpu_model'] = cpu_out or platform.processor() or '—'
-    info['cpu_cores'] = run_cmd("nproc")[0] or '—'
+    info['cpu_model'] = run_cmd("grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2")[0].strip()
+    info['cpu_cores'] = run_cmd("nproc")[0]
 
     # Memory
     mem_out = run_cmd("free -h | grep Mem")[0]
