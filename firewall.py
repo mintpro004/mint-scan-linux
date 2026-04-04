@@ -236,25 +236,10 @@ class FirewallScreen(ctk.CTkFrame):
             ], columns=4).pack(fill='x', padx=8, pady=(4,8))
 
     def _install_ufw(self):
-        self._alog("Installing UFW Firewall (Chromebook-safe)...")
-        # Chromebook Crostini: iptables-persistent may not be available.
-        # Use --no-install-recommends and skip iptables-persistent if on Chromebook.
-        import platform
-        is_cros = shutil.which('crosh') is not None or \
-                  'chromeos' in platform.uname().release.lower() or \
-                  'cros' in open('/proc/version').read().lower() if \
-                  os.path.exists('/proc/version') else False
-
-        if is_cros:
-            cmds = [
-                'sudo apt-get update -qq',
-                'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ufw',
-                'sudo ufw --force enable',
-                'sudo ufw default deny incoming',
-                'sudo ufw default allow outgoing',
-            ]
-        else:
-            cmds = [
+        self._alog("Installing UFW Firewall...")
+        InstallerPopup(self,
+            title="Install UFW Firewall",
+            commands=[
                 'echo "iptables-persistent iptables-persistent/autosave_v4 boolean true" | sudo debconf-set-selections',
                 'echo "iptables-persistent iptables-persistent/autosave_v6 boolean true" | sudo debconf-set-selections',
                 'sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq',
@@ -263,10 +248,7 @@ class FirewallScreen(ctk.CTkFrame):
                 'sudo ufw default deny incoming',
                 'sudo ufw default allow outgoing',
                 'sudo ufw allow ssh',
-            ]
-        InstallerPopup(self,
-            title="Install UFW Firewall",
-            commands=cmds,
+            ],
             success_msg="UFW Firewall installed and enabled!",
             on_done=lambda: threading.Thread(target=self._load_status, daemon=True).start()
         )
