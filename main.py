@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Mint Scan v8 — Entry Point
+Mint Scan v7 — Entry Point
 Loads saved theme before window opens, then launches app.
 """
 import sys, os

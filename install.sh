@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║   MINT SCAN v8 — WORLD-CLASS SELF-HEALING INSTALLER         ║
+# ║   MINT SCAN v7 — WORLD-CLASS SELF-HEALING INSTALLER         ║
 # ║   Fixes all known issues on Ubuntu, Kali, Chromebook, WSL   ║
 # ╚══════════════════════════════════════════════════════════════╝
 CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -10,7 +10,7 @@ cd "$SCRIPT_DIR"
 
 echo -e "${CYAN}${BOLD}"
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║   MINT SCAN v8 — SELF-HEALING INSTALLER                     ║"
+echo "║   MINT SCAN v7 — SELF-HEALING INSTALLER                     ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -66,7 +66,7 @@ grep -q "load_theme_settings" main.py 2>/dev/null || {
     cat > main.py << 'MAINEOF'
 #!/usr/bin/env python3
 """
-Mint Scan v8 — Entry Point
+Mint Scan v7 — Entry Point
 Loads saved theme before window opens, then launches app.
 """
 import sys, os
@@ -134,7 +134,7 @@ cat > ~/.local/share/applications/mint-scan.desktop << DESKTOP
 Version=1.0
 Type=Application
 Name=Mint Scan
-Comment=Advanced Security Auditor v8 — Mint Projects
+Comment=Advanced Security Auditor v7 — Mint Projects
 Exec=bash $SCRIPT_DIR/run.sh
 Icon=$SCRIPT_DIR/icon.png
 Terminal=false

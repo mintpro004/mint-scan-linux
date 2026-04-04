@@ -144,25 +144,17 @@ class InstallerPopup(ctk.CTkToplevel):
             self.after(500, self._on_done)
 
     def _run_cmd(self, cmd):
-        """Run command with robust sudo handling for Chromebook/Ubuntu/Kali/WSL."""
-        import shlex
-
-        original = cmd.strip()
-
-        if original.startswith('sudo ') and os.geteuid() != 0:
-            inner = original[5:].strip()
-            inner_q = inner.replace("'", "'\''")
-
-            if shutil.which('pkexec'):
-                # GUI password prompt — works on GNOME desktops
-                cmd = f"pkexec bash -c '{inner_q}'"
+        """Run a single command and stream output to log"""
+        # Replace sudo with pkexec for GUI prompt if not running as root
+        if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
+            has_pkexec = os.path.exists('/usr/bin/pkexec') or shutil.which('pkexec')
+            if has_pkexec:
+                inner = cmd.strip()[5:]
+                # Safe quoting for bash -c
+                inner_quoted = inner.replace("'", "'\\''")
+                cmd = f"pkexec bash -c '{inner_quoted}'"
             else:
-                # Chromebook Crostini / headless: try passwordless sudo first,
-                # then regular sudo (will prompt in the terminal that launched run.sh)
-                cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
-
-        # Always set DEBIAN_FRONTEND so apt never hangs on prompts
-        run_env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
+                pass
 
         try:
             proc = subprocess.Popen(
@@ -170,8 +162,7 @@ class InstallerPopup(ctk.CTkToplevel):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=1,
-                env=run_env
+                bufsize=1
             )
             for line in proc.stdout:
                 line = line.rstrip()
