@@ -248,14 +248,14 @@ class WirelessScreen(ctk.CTkFrame):
         how = Card(body, accent=C['bl'])
         how.pack(fill='x', padx=14, pady=(0,8))
         ctk.CTkLabel(how,
-            text="Mint Scan runs a Wi-Fi sync server on your Chromebook.\n"
+            text="Mint Scan runs a Wi-Fi sync server directly on your Linux machine.\n"
                  "Your Android phone connects to it over your home Wi-Fi — no USB needed.\n\n"
-                 "Option A (Easiest):  Open the server URL in your phone's browser\n"
-                 "                     and use the web dashboard to send data.\n\n"
-                 "Option B (Automatic): Install the Mint Scan APK on your phone.\n"
-                 "                      It auto-syncs calls, SMS, battery, and Wi-Fi in the background.\n\n"
+                 "STEP 1: Tap ▶ START SERVER below.\n"
+                 "STEP 2: Open the URL shown on your phone's browser.\n"
+                 "STEP 3: The companion app loads instantly — battery, network, sync ready.\n\n"
+                 "For USB/ADB connection (Android 16+), use the USB Sync tab instead.\n"
                  "Both phone and Chromebook must be on the SAME Wi-Fi network.",
-            font=MONO_SM, text_color=C['mu'], justify='left'
+            font=('Courier',10), text_color=C['tx'], justify='left'
         ).pack(anchor='w', padx=12, pady=(10,10))
 
         # ── Server connection info ────────────────────────────────
@@ -299,22 +299,25 @@ class WirelessScreen(ctk.CTkFrame):
             text="No data synced yet. Start the server and open the URL on your phone.",
             font=MONO_SM, text_color=C['mu']).pack(pady=8)
 
-        # ── APK section ───────────────────────────────────────────
-        SectionHeader(body, '05', 'INSTALL COMPANION APP ON PHONE').pack(fill='x', padx=14, pady=(10,4))
-        apk_card = Card(body, accent=C['am'])
-        apk_card.pack(fill='x', padx=14, pady=(0,8))
-        ctk.CTkLabel(apk_card,
-            text="The Mint Scan Companion APK auto-syncs your phone to this server.\n"
-                 "Build and install it once — it runs in the background on your phone.",
-            font=MONO_SM, text_color=C['mu'], justify='left'
-        ).pack(anchor='w', padx=12, pady=(10,6))
-
-        btn_row = ctk.CTkFrame(apk_card, fg_color='transparent')
-        btn_row.pack(fill='x', padx=12, pady=(0,10))
-        Btn(btn_row, "📱 BUILD COMPANION APK",
-            command=self._build_apk, width=200).pack(side='left', padx=(0,8))
-        Btn(btn_row, "📦 INSTALL VIA USB",
-            command=self._install_via_usb, variant='blue', width=160).pack(side='left')
+        # ── Open on Phone ─────────────────────────────────────────
+        SectionHeader(body, '05', 'OPEN COMPANION ON PHONE').pack(fill='x', padx=14, pady=(10,4))
+        comp_card = Card(body, accent=C['ac'])
+        comp_card.pack(fill='x', padx=14, pady=(0,8))
+        ctk.CTkLabel(comp_card,
+            text="📱  HOW TO OPEN ON YOUR PHONE:",
+            font=('Courier',11,'bold'), text_color=C['ac']
+        ).pack(anchor='w', padx=12, pady=(12,4))
+        ctk.CTkLabel(comp_card,
+            text="Method A — Browser (Wi-Fi):\n"
+                 "  1. Start the server above\n"
+                 "  2. Open the URL shown in your phone's browser\n"
+                 "  3. The companion app loads instantly — no install needed\n\n"
+                 "Method B — USB (ADB, works on Android 16):\n"
+                 "  1. Connect phone via USB with USB Debugging enabled\n"
+                 "  2. Go to USB Sync tab → tap 🚀 OPEN COMPANION ON PHONE\n"
+                 "  3. Served via ADB port-forward — bypasses all file restrictions",
+            font=('Courier',9), text_color=C['tx'], justify='left'
+        ).pack(anchor='w', padx=12, pady=(0,12))
 
         # ── Sync log ──────────────────────────────────────────────
         SectionHeader(body, '06', 'SYNC LOG').pack(fill='x', padx=14, pady=(10,4))
@@ -474,233 +477,9 @@ class WirelessScreen(ctk.CTkFrame):
                 ).pack(anchor='w')
 
         self._log_msg(f"Data refreshed — {len(calls)} calls, {len(sms)} SMS")
-
-    def _build_apk(self):
-        """Launch the APK builder"""
-        popup = ctk.CTkToplevel(self)
-        popup.title("Build Companion APK")
-        popup.geometry("640x500")
-        popup.configure(fg_color=C['bg'])
-        popup.lift()
-        popup.focus_force()
-
-        ctk.CTkLabel(popup, text="📱  BUILD MINT SCAN COMPANION APK",
-                     font=('Courier',13,'bold'), text_color=C['ac']
-                     ).pack(pady=(16,4), padx=20, anchor='w')
-        ctk.CTkLabel(popup,
-            text="This builds an Android APK using Buildozer (Python→Android).\n"
-                 "The APK, once installed on your phone, auto-syncs data to Mint Scan over Wi-Fi.\n",
-            font=MONO_SM, text_color=C['mu'], justify='left'
-        ).pack(padx=20, anchor='w')
-
-        ip   = get_local_ip()
-        port = self._port
-        url  = f"http://{ip}:{port}"
-
-        ctk.CTkLabel(popup,
-            text=f"Server URL to embed in APK: {url}",
-            font=('Courier',10,'bold'), text_color=C['ok']
-        ).pack(padx=20, anchor='w', pady=(4,12))
-
-        log = ctk.CTkTextbox(popup, height=250, font=('Courier',8),
-                              fg_color=C['s2'], text_color=C['ok'],
-                              border_width=0)
-        log.pack(fill='x', padx=12, pady=4)
-        log.configure(state='disabled')
-
-        def _log(msg):
-            log.configure(state='normal')
-            log.insert('end', msg+'\n')
-            log.see('end')
-            log.configure(state='disabled')
-
-        def _build():
-            _log("Checking for Buildozer...")
-            # Check if buildozer installed
-            r = subprocess.run("which buildozer", shell=True, capture_output=True)
-            if r.returncode != 0:
-                _log("Buildozer not found. Installing...")
-                subprocess.run("pip install buildozer --break-system-packages -q",
-                               shell=True, capture_output=True)
-
-            _log("Creating companion app source...")
-            build_dir = os.path.expanduser("~/mint-scan-companion")
-            os.makedirs(build_dir, exist_ok=True)
-
-            # Write the companion app main.py
-            app_src = f'''"""Mint Scan Companion — Android App"""
-import threading, time, json
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivy.uix.button import Button
-from kivy.uix.scrollview import ScrollView
-from kivy.clock import Clock
-
-SERVER_URL = "{url}"
-
-try:
-    import urllib.request as req
-    from android.permissions import request_permissions, Permission  # type: ignore
-    from jnius import autoclass  # type: ignore
-    ANDROID = True
-except ImportError:
-    ANDROID = False
-
-def sync_device_info():
-    data = {{"brand":"Unknown","model":"Unknown","android":"0"}}
-    if ANDROID:
-        try:
-            Build = autoclass('android.os.Build')
-            VERSION = autoclass('android.os.Build$VERSION')
-            data = {{
-                "brand": str(Build.BRAND),
-                "model": str(Build.MODEL),
-                "android": str(VERSION.RELEASE),
-            }}
-        except Exception: pass
-    _post("/sync/device", data)
-
-def _post(endpoint, data):
-    try:
-        body = json.dumps(data).encode()
-        r = req.Request(SERVER_URL+endpoint, data=body,
-                        headers={{"Content-Type":"application/json"}})
-        req.urlopen(r, timeout=5)
-    except Exception as e:
-        print(f"Sync error: e")
-
-class SyncLayout(BoxLayout):
-    def __init__(self, **kw):
-        super().__init__(orientation="vertical", **kw)
-        from kivy.graphics import Color, Rectangle
-        with self.canvas.before:
-            Color(0.008, 0.047, 0.078)
-            self.bg_rect = Rectangle(size=self.size, pos=self.pos)
-        self.bind(size=self._update_bg, pos=self._update_bg)
-
-        self.status = Label(
-            text="MINT SCAN COMPANION",
-            font_size=20, bold=True,
-            color=(0,1,0.88,1), size_hint_y=None, height=50)
-        self.add_widget(self.status)
-
-        self.info = Label(
-            text=f"Server: {SERVER_URL}",
-            font_size=12, color=(0.2,0.38,0.47,1),
-            size_hint_y=None, height=30)
-        self.add_widget(self.info)
-
-        btn = Button(text="SYNC NOW",
-                     background_color=(0,0.8,0.55,1),
-                     size_hint_y=None, height=60)
-        btn.bind(on_press=lambda x: threading.Thread(
-            target=self._do_sync, daemon=True).start())
-        self.add_widget(btn)
-
-        self.log_lbl = Label(
-            text="Tap SYNC NOW to send data to Mint Scan",
-            font_size=11, color=(0.2,0.38,0.47,1))
-        self.add_widget(self.log_lbl)
-
-    def _update_bg(self, *a):
-        self.bg_rect.size = self.size
-        self.bg_rect.pos = self.pos
-
-    def _do_sync(self):
-        Clock.schedule_once(lambda dt: setattr(
-            self.status, 'text', 'SYNCING...'), 0)
-        sync_device_info()
-        Clock.schedule_once(lambda dt: setattr(
-            self.status, 'text', 'SYNC COMPLETE'), 0)
-        Clock.schedule_once(lambda dt: setattr(
-            self.log_lbl, 'text',
-            f'Last sync: {{time.strftime("%H:%M:%S")}}'), 0)
-
-class MintScanCompanion(App):
-    def build(self):
-        if ANDROID:
-            request_permissions([
-                Permission.READ_CALL_LOG,
-                Permission.READ_CONTACTS,
-                Permission.READ_SMS,
-                Permission.ACCESS_WIFI_STATE,
-            ])
-        layout = SyncLayout()
-        threading.Thread(target=self._auto_sync,
-                         args=(layout,), daemon=True).start()
-        return layout
-
-    def _auto_sync(self, layout):
-        while True:
-            time.sleep(60)
-            threading.Thread(target=layout._do_sync, daemon=True).start()
-
-if __name__ == "__main__":
-    MintScanCompanion().run()
-'''
-
-            with open(os.path.join(build_dir, 'main.py'), 'w') as f:
-                f.write(app_src)
-
-            # Write buildozer.spec
-            spec = f"""[app]
-title = Mint Scan
-package.name = mintscan
-package.domain = za.mintprojects
-source.dir = .
-source.include_exts = py,png,kv
-version = 7.0
-requirements = python3,kivy,requests,android
-android.permissions = READ_CALL_LOG,READ_CONTACTS,READ_SMS,ACCESS_WIFI_STATE,INTERNET
-android.api = 31
-android.minapi = 21
-android.ndk = 25b
-android.archs = arm64-v8a
-fullscreen = 0
-[buildozer]
-log_level = 2
-"""
-            with open(os.path.join(build_dir, 'buildozer.spec'), 'w') as f:
-                f.write(spec)
-
-            _log(f"✓ Source written to: {build_dir}")
-            _log("")
-            _log("To build the APK, run these commands:")
-            _log(f"  cd {build_dir}")
-            _log("  pip install buildozer kivy --break-system-packages")
-            _log("  buildozer android debug")
-            _log("")
-            _log("The APK will be in:")
-            _log(f"  {build_dir}/bin/mintscan-7.0-debug.apk")
-            _log("")
-            _log("Then install it via APK INSTALL tab or:")
-            _log(f"  adb install {build_dir}/bin/mintscan-7.0-debug.apk")
-            _log("")
-            _log("NOTE: First build takes 20-40 mins (downloads Android SDK).")
-            _log("Subsequent builds: ~2 minutes.")
-            _log("")
-            _log("ALTERNATIVE — Test without building:")
-            _log(f"  Open {url} in your phone browser")
-            _log("  This gives instant access without building an APK!")
-
         threading.Thread(target=_build, daemon=True).start()
         Btn(popup, "CLOSE", command=popup.destroy,
             variant='ghost', width=80).pack(pady=8)
-
-    def _install_via_usb(self):
-        """Install companion APK via USB using ADB"""
-        apk_path = os.path.expanduser(
-            "~/mint-scan-companion/bin/mintscan-7.0-debug.apk")
-        if not os.path.exists(apk_path):
-            self._log_msg(
-                "No APK found. Build it first using BUILD COMPANION APK.")
-            self._log_msg(
-                f"Or provide path: {apk_path}")
-            return
-        self._log_msg("Installing APK via USB...")
-        threading.Thread(target=self._do_usb_install,
-                         args=(apk_path,), daemon=True).start()
 
     def _do_usb_install(self, path):
         out, err = subprocess.Popen(

@@ -8,25 +8,33 @@ import customtkinter as ctk
 
 # ── Theme palettes ────────────────────────────────────────────────
 DARK_THEME = {
-    'bg':  '#020c14', 'sf':  '#061523', 's2':  '#0a1e2e',
-    'br':  '#0d2a3d', 'br2': '#1a3a52', 'ac':  '#00ffe0',
-    'wn':  '#ff4c4c', 'am':  '#ffb830', 'ok':  '#39ff88',
-    'bl':  '#4d9fff', 'pu':  '#c084fc', 'tx':  '#c8e8f4',
-    'mu':  '#3a6278', 'mu2': '#5a8298',
+    # Backgrounds
+    'bg':  '#05111f', 'sf':  '#0a1f35', 's2':  '#0f2847',
+    # Borders
+    'br':  '#1a3f5c', 'br2': '#2a5a7a',
+    # Accent
+    'ac':  '#00ffe0',
+    # Status
+    'wn':  '#ff5555', 'am':  '#ffcc44', 'ok':  '#44ff99',
+    'bl':  '#55aaff', 'pu':  '#cc88ff',
+    # Text — high contrast for readability
+    'tx':  '#e8f4ff',
+    'mu':  '#7fb8d8',
+    'mu2': '#9ecce8',
 }
 LIGHT_THEME = {
     'bg':  '#f0f4f8', 'sf':  '#e2e8f0', 's2':  '#ffffff',
-    'br':  '#cbd5e1', 'br2': '#94a3b8', 'ac':  '#0077cc',
-    'wn':  '#dc2626', 'am':  '#d97706', 'ok':  '#16a34a',
-    'bl':  '#2563eb', 'pu':  '#7c3aed', 'tx':  '#1e293b',
-    'mu':  '#64748b', 'mu2': '#475569',
+    'br':  '#c0cfe0', 'br2': '#8aabb8', 'ac':  '#006ec0',
+    'wn':  '#cc1111', 'am':  '#cc7700', 'ok':  '#117744',
+    'bl':  '#1155cc', 'pu':  '#6622bb', 'tx':  '#0d1f2d',
+    'mu':  '#3a5a70', 'mu2': '#2d4a60',
 }
 
 C = dict(DARK_THEME)
-MONO    = ('Courier', 10)
-MONO_SM = ('Courier', 9)
-MONO_LG = ('Courier', 13, 'bold')
-MONO_XL = ('Courier', 36, 'bold')
+MONO    = ('Courier', 11)
+MONO_SM = ('Courier', 10)
+MONO_LG = ('Courier', 14, 'bold')
+MONO_XL = ('Courier', 38, 'bold')
 _current_theme = 'dark'
 
 

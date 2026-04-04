@@ -1,10 +1,12 @@
 """
 USB Phone Sync + Companion App + APK Installer — unified phone tab.
-No browsing required. Companion app pushes itself to phone via ADB.
+Companion served over HTTP via ADB port-forward — works on ALL Android versions.
+Chrome file:// access denied issue completely bypassed.
 """
 import tkinter as tk
 import customtkinter as ctk
-import threading, subprocess, os, re, time, shutil
+import threading, subprocess, os, re, time, shutil, socket
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from installer import install_adb
 from utils import run_cmd as _r
@@ -12,13 +14,69 @@ from utils import run_cmd as _r
 BASE = os.path.dirname(os.path.abspath(__file__))
 COMPANION_HTML = os.path.join(BASE, 'companion_app.html')
 
+# Port the mini HTTP server runs on locally — ADB forwards this to the phone
+COMPANION_PORT = 8765
+
+
+class _CompanionHandler(BaseHTTPRequestHandler):
+    """Tiny HTTP server that serves companion_app.html over localhost.
+    Headers set for Android 16 Chrome compatibility."""
+
+    def log_message(self, fmt, *args):
+        pass  # Silent
+
+    def do_GET(self):
+        try:
+            html = open(COMPANION_HTML, 'rb').read()
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', len(html))
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Pragma', 'no-cache')
+            # Android 16 Chrome CORS — allow everything on loopback
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            # Allow battery, location, notifications APIs in Chrome
+            self.send_header('Permissions-Policy', 'geolocation=*, battery=*')
+            self.end_headers()
+            self.wfile.write(html)
+        except Exception as e:
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(str(e).encode())
+
+    def do_POST(self):
+        """Accept sync data posted back from the companion app."""
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+            body   = self.rfile.read(length)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+        except Exception:
+            self.send_response(500)
+            self.end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
 
 class UsbScreen(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
-        self._built  = False
-        self._device = None
+        self._built   = False
+        self._device  = None
+        self._comp_server   = None   # HTTPServer instance
+        self._comp_thread   = None   # server thread
+        self._comp_port     = COMPANION_PORT
 
     def on_focus(self):
         if not self._built:
@@ -86,20 +144,20 @@ class UsbScreen(ctk.CTkFrame):
         comp.pack(fill='x', padx=14, pady=(0,8))
 
         ctk.CTkLabel(comp,
-            text="📱  SELF-INSTALLING COMPANION",
+            text="📱  COMPANION — HTTP SERVER (USB)",
             font=('Courier',11,'bold'), text_color=C['ac']
         ).pack(anchor='w', padx=12, pady=(12,4))
 
         ctk.CTkLabel(comp,
-            text="Mint Scan builds and pushes the companion app directly to your phone.\n"
-                 "No APK file needed. No Play Store. No browsing.\n"
-                 "Connect your phone via USB then tap the button below.",
+            text="Starts a local HTTP server and opens the companion\n"
+                 "on your phone via ADB port-forward over the USB cable.\n"
+                 "Works on ALL Android versions — no file:// error.",
             font=('Courier',8), text_color=C['mu'], justify='left'
         ).pack(anchor='w', padx=12, pady=(0,8))
 
-        # THE button — big, clear, does everything automatically
+        # THE button — starts HTTP server + ADB forward + opens on phone
         self.comp_btn = ctk.CTkButton(comp,
-            text="🚀  INSTALL COMPANION ON PHONE",
+            text="🚀  OPEN COMPANION ON PHONE (USB)",
             font=('Courier',11,'bold'),
             height=48,
             fg_color=C['ac'],
@@ -109,7 +167,12 @@ class UsbScreen(ctk.CTkFrame):
             command=self._install_companion)
         self.comp_btn.pack(fill='x', padx=12, pady=(0,6))
 
-        Btn(comp, "▶ OPEN COMPANION (already installed)",
+        Btn(comp, "⏹ STOP SERVER",
+            command=self._stop_companion_server,
+            variant='danger', width=160
+        ).pack(anchor='w', padx=12, pady=(0,4))
+
+        Btn(comp, "▶ REOPEN ON PHONE (server running)",
             command=self._open_companion,
             variant='ghost', width=260
         ).pack(anchor='w', padx=12, pady=(0,10))
@@ -310,93 +373,179 @@ class UsbScreen(ctk.CTkFrame):
         ))
         self._log(f"Connected: {brand} {model} (Android {android}, {bat_pct})")
 
-    # ── Companion install ──────────────────────────────────────
+    # ── Companion — HTTP server over ADB port-forward ────────
+
+    def _start_companion_server(self):
+        """Start local HTTP server on COMPANION_PORT if not already running."""
+        if self._comp_server is not None:
+            return True  # Already running
+        if not os.path.exists(COMPANION_HTML):
+            self._log(f"✗ companion_app.html not found at: {COMPANION_HTML}")
+            return False
+        try:
+            self._comp_server = HTTPServer(('127.0.0.1', self._comp_port), _CompanionHandler)
+            self._comp_thread = threading.Thread(
+                target=self._comp_server.serve_forever, daemon=True)
+            self._comp_thread.start()
+            self._log(f"✓ Companion HTTP server started on port {self._comp_port}")
+            return True
+        except OSError as e:
+            # Port in use — try next port
+            self._comp_port += 1
+            if self._comp_port < COMPANION_PORT + 5:
+                return self._start_companion_server()
+            self._log(f"✗ Could not start HTTP server: {e}")
+            return False
+
+    def _stop_companion_server(self):
+        """Shut down the HTTP server and remove ADB forward."""
+        if self._comp_server:
+            try:
+                self._comp_server.shutdown()
+                self._comp_server = None
+                self._comp_thread = None
+                self._comp_port   = COMPANION_PORT
+                self._log("⏹ Companion server stopped.")
+            except Exception as e:
+                self._log(f"Stop error: {e}")
+        # Remove ADB port forward
+        if self._device:
+            _r(f"adb -s {self._device} forward --remove tcp:{self._comp_port}", timeout=5)
 
     def _install_companion(self):
+        """Start server + ADB forward + open URL on phone browser."""
         if not self._device:
             self._log("⚠ No phone connected.")
             self._log("  Connect USB cable → Enable USB Debugging → Tap Allow → Tap ↺ RESCAN")
             return
-
-        if not os.path.exists(COMPANION_HTML):
-            self._log(f"⚠ companion_app.html not found at: {COMPANION_HTML}")
-            self._log("  Update your files: cd ~/mint-scan-linux && git pull && bash install.sh")
-            return
-
-        # Disable button during install
         self.after(0, lambda: self.comp_btn.configure(
-            state='disabled', text='⟳  Installing...'))
+            state='disabled', text='⟳  Starting...'))
         self.after(0, lambda: self.comp_prog.set(0.1))
         threading.Thread(target=self._do_install_companion, daemon=True).start()
 
     def _do_install_companion(self):
-        # Push to a more standard location
-        dest = '/sdcard/Download/mint_companion.html'
-        self._log("Pushing Mint Scan Companion to phone...")
-        self.after(0, lambda: self.comp_prog.set(0.3))
-
-        out, err, rc = _r(
-            f"adb -s {self._device} push '{COMPANION_HTML}' '{dest}'",
-            timeout=20)
-
-        if rc != 0:
-            self._log(f"✗ Push failed: {err or out}")
-            self._log("  Check: is USB Debugging still enabled? Try RESCAN.")
+        # Step 1: Start local HTTP server on desktop
+        if not self._start_companion_server():
             self.after(0, lambda: self.comp_btn.configure(
-                state='normal', text='🚀  INSTALL COMPANION ON PHONE'))
+                state='normal', text='🚀  OPEN COMPANION ON PHONE (USB)'))
             self.after(0, lambda: self.comp_prog.set(0))
             return
 
-        self._log("✓ Companion app pushed to phone")
-        self.after(0, lambda: self.comp_prog.set(0.7))
-        self._log("Opening companion in phone browser...")
+        self.after(0, lambda: self.comp_prog.set(0.35))
 
-        # Try to open in Chrome, HTML Viewer, or generic VIEW intent
-        open_rc = 1
+        # Step 2: adb reverse — tunnels phone's localhost:PORT → desktop:PORT
+        # This is an ADB transport feature, works on all Android versions including 16
+        fwd_out, fwd_err, fwd_rc = _r(
+            f"adb -s {self._device} reverse tcp:{self._comp_port} tcp:{self._comp_port}",
+            timeout=10)
+
+        if fwd_rc != 0:
+            self._log(f"⚠ adb reverse failed ({fwd_err.strip()}) — trying adb forward...")
+            _, fwd_err2, fwd_rc2 = _r(
+                f"adb -s {self._device} forward tcp:{self._comp_port} tcp:{self._comp_port}",
+                timeout=10)
+            if fwd_rc2 != 0:
+                self._log(f"✗ Port-forward failed: {fwd_err2.strip()}")
+                self._log("  Try: re-plug USB cable and tap ↺ RESCAN")
+                self.after(0, lambda: self.comp_btn.configure(
+                    state='normal', text='🚀  OPEN COMPANION ON PHONE (USB)'))
+                self.after(0, lambda: self.comp_prog.set(0))
+                return
+
+        self._log(f"✓ Port-forward active on port {self._comp_port}")
+        self.after(0, lambda: self.comp_prog.set(0.65))
+
+        # Step 3: Open http://localhost:PORT on phone browser
+        # Android 16 am start syntax — must use -p for package (positional arg removed)
+        url = f"http://localhost:{self._comp_port}"
+
+        # Try explicit component first (most reliable on Android 16),
+        # then -p package flag, then generic VIEW intent
         intents = [
-            # 1. HTML Viewer (most reliable for local files)
-            f"adb -s {self._device} shell am start -n com.android.htmlviewer/com.android.htmlviewer.HTMLViewerActivity -a android.intent.action.VIEW -d 'file://{dest}' -t 'text/html'",
-            # 2. Chrome direct URL
-            f"adb -s {self._device} shell am start -n com.android.chrome/com.google.android.apps.chrome.Main -d 'file://{dest}'",
-            # 3. Samsung Browser (common on many devices)
-            f"adb -s {self._device} shell am start -n com.sec.android.app.sbrowser/com.sec.android.app.sbrowser.SBrowserMainActivity -d 'file://{dest}'",
-            # 4. Generic VIEW intent (let Android decide)
-            f"adb -s {self._device} shell am start -a android.intent.action.VIEW -d 'file://{dest}' -t 'text/html'",
-            # 5. Generic VIEW intent without type (sometimes works better)
-            f"adb -s {self._device} shell am start -a android.intent.action.VIEW -d 'file://{dest}'"
+            # Chrome — explicit component (Android 16 preferred)
+            f"adb -s {self._device} shell am start"
+            f" -n com.android.chrome/com.google.android.apps.chrome.Main"
+            f" -a android.intent.action.VIEW -d '{url}'",
+
+            # Samsung Internet — explicit component
+            f"adb -s {self._device} shell am start"
+            f" -n com.sec.android.app.sbrowser/.SBrowserMainActivity"
+            f" -a android.intent.action.VIEW -d '{url}'",
+
+            # Chrome with -p package flag (Android 13+ syntax)
+            f"adb -s {self._device} shell am start"
+            f" -a android.intent.action.VIEW -d '{url}'"
+            f" -p com.android.chrome",
+
+            # Firefox
+            f"adb -s {self._device} shell am start"
+            f" -a android.intent.action.VIEW -d '{url}'"
+            f" -p org.mozilla.firefox",
+
+            # Brave
+            f"adb -s {self._device} shell am start"
+            f" -a android.intent.action.VIEW -d '{url}'"
+            f" -p com.brave.browser",
+
+            # Android 16 generic — system picks default browser
+            f"adb -s {self._device} shell am start"
+            f" -a android.intent.action.VIEW -d '{url}'"
+            f" --activity-single-top",
         ]
-        
-        for intent_cmd in intents:
-            out, err, open_rc = _r(intent_cmd, timeout=8)
-            if open_rc == 0 and "Error" not in out:
+
+        opened = False
+        for cmd in intents:
+            out, err, rc = _r(cmd.replace('\n', ' '), timeout=8)
+            combined = (out + err).lower()
+            if rc == 0 and 'error' not in combined and 'exception' not in combined:
+                opened = True
+                self._log(f"✓ Browser intent sent successfully")
                 break
+            else:
+                # Log which one failed for debugging
+                pkg = re.search(r'(?:-n |\.)(com\.\S+)', cmd)
+                if pkg:
+                    self._log(f"  ↳ {pkg.group(1)}: not found, trying next...")
 
         self.after(0, lambda: self.comp_prog.set(1.0))
-
-        if open_rc == 0:
-            self._log("✓ Companion app intent sent to phone.")
-            self._log("  Note: If it asks which app to use, pick HTML Viewer or Browser.")
-            self._log("  Note: If you see ACCESS_DENIED, manually open:")
-            self._log("  Files app → Downloads → mint_companion.html")
-        else:
-            self._log("✓ App pushed to /sdcard/Download/mint_companion.html")
-            self._log("  To open it manually: Files app → Downloads → Open mint_companion.html")
-
         self.after(0, lambda: self.comp_btn.configure(
-            state='normal', text='🚀  INSTALL COMPANION ON PHONE'))
+            state='normal', text='🚀  OPEN COMPANION ON PHONE (USB)'))
+
+        if opened:
+            self._log(f"✓ Companion opened on phone!")
+            self._log(f"  Server stays running. Tap ⏹ STOP SERVER when done.")
+        else:
+            # All intents failed — give manual URL prominently
+            self._log(f"")
+            self._log(f"✓ SERVER IS RUNNING — open this on your phone:")
+            self._log(f"  ► http://localhost:{self._comp_port}")
+            self._log(f"  Type this in your phone's browser address bar.")
+            self._log(f"  (Works because ADB tunnel is active over USB)")
 
     def _open_companion(self):
+        """Re-open companion — server must already be running."""
         if not self._device:
-            self._log("No device connected. Tap ↺ RESCAN first.")
+            self._log("No device. Tap ↺ RESCAN first.")
             return
-        dest = '/sdcard/Download/mint_companion.html'
+        if self._comp_server is None:
+            self._log("Server not running — tap 🚀 OPEN COMPANION first.")
+            return
+        url = f"http://localhost:{self._comp_port}"
         def _do():
-            _, _, rc = _r(
-                f"adb -s {self._device} shell am start -n com.android.htmlviewer/com.android.htmlviewer.HTMLViewerActivity "
-                f"-a android.intent.action.VIEW -d 'file://{dest}' -t 'text/html'",
-                timeout=8)
-            self._log("✓ Opened on phone" if rc == 0
-                      else "Open manually: Files → Downloads → mint_companion.html")
+            # Android 16: try component first, then generic
+            cmds = [
+                f"adb -s {self._device} shell am start"
+                f" -n com.android.chrome/com.google.android.apps.chrome.Main"
+                f" -a android.intent.action.VIEW -d '{url}'",
+                f"adb -s {self._device} shell am start"
+                f" -a android.intent.action.VIEW -d '{url}' --activity-single-top",
+            ]
+            for cmd in cmds:
+                out, err, rc = _r(cmd.replace('\n', ' '), timeout=8)
+                if rc == 0 and 'error' not in (out+err).lower():
+                    self._log(f"✓ Reopened: {url}")
+                    return
+            self._log(f"Manual: open  http://localhost:{self._comp_port}  in phone browser")
         threading.Thread(target=_do, daemon=True).start()
 
     # ── APK install ───────────────────────────────────────────

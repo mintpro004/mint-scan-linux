@@ -32,6 +32,8 @@ ALL_TABS = [
     ('ports',       'Port Scan',    '🔍'),
     ('usb',         'USB Sync',     '📱'),
     ('wireless',    'Wireless',     '📶'),
+    ('devscan',     'Device Scan',  '📡'),
+    ('recovery',    'Recovery',     '🗃'),
     ('netscan',     'Net Scan',     '🔬'),
     ('malware',     'Malware',      '🦠'),
     ('sysfix',      'Sys Fix',      '🔧'),
@@ -200,6 +202,8 @@ class MintScanApp:
             'usb':         _safe('usb',         'UsbScreen'),
             'apk':         _safe('usb',          'ApkScreen'),
             'wireless':    _safe('wireless',     'WirelessScreen'),
+            'devscan':     _safe('devscan',      'DevScanScreen'),
+            'recovery':    _safe('recovery',     'RecoveryScreen'),
             'netscan':     _safe('netscan',     'NetScanScreen'),
             'malware':     _safe('malware',     'MalwareScreen'),
             'sysfix':      _safe('sysfix',      'SysFixScreen'),
@@ -280,7 +284,7 @@ class MintScanApp:
         import importlib
         import widgets
         import dash, perms, wifi, calls, network, battery, threats, notifs
-        import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, auditor, guardian, settings, wireless
+        import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, auditor, guardian, settings, wireless, devscan, recovery
         
         # Force reload of modules that use fonts/colors
         importlib.reload(widgets)
@@ -305,6 +309,9 @@ class MintScanApp:
         importlib.reload(auditor)
         importlib.reload(guardian)
         importlib.reload(settings)
+        importlib.reload(wireless)
+        importlib.reload(devscan)
+        importlib.reload(recovery)
 
         # Re-create sidebar and content areas in the same container
         self.sidebar = ScrollableFrame(self.container, width=190,
@@ -332,8 +339,10 @@ class MintScanApp:
             'notifs':      notifs.NotifsScreen,
             'ports':       ports.PortsScreen,
             'usb':         usb.UsbScreen,
-            'apk':         usb.ApkScreen, # alias
+            'apk':         usb.ApkScreen,
             'wireless':    wireless.WirelessScreen,
+            'devscan':     devscan.DevScanScreen,
+            'recovery':    recovery.RecoveryScreen,
             'netscan':     netscan.NetScanScreen,
             'malware':     malware.MalwareScreen,
             'sysfix':      sysfix.SysFixScreen,
