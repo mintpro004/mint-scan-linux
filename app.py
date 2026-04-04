@@ -1,5 +1,5 @@
 """
-Mint Scan v7 — Main Application
+Mint Scan v8 — Main Application
 Polished UI: smooth tab switching, proper sizing, responsive layout.
 """
 import tkinter as tk
@@ -10,7 +10,7 @@ import threading, time, sys, os, json
 from widgets import C, apply_theme, ScrollableFrame
 
 BOOT_LINES = [
-    "INITIALISING MINT SCAN v7...",
+    "INITIALISING MINT SCAN v8...",
     "LOADING SECURITY MODULES...",
     "PROBING NETWORK INTERFACES...",
     "LOADING THREAT ENGINE...",
@@ -48,7 +48,7 @@ ALL_TABS = [
 class MintScanApp:
     def __init__(self):
         self.root = ctk.CTk()
-        self.root.title("Mint Scan v7")
+        self.root.title("Mint Scan v8")
         self.root.geometry("1140x740")
         self.root.minsize(920, 620)
         self.root.configure(fg_color=C['bg'])
@@ -82,7 +82,7 @@ class MintScanApp:
         ctk.CTkLabel(inner, text="[ MINT SCAN ]",
                      font=('Courier',34,'bold'),
                      text_color=C['ac']).pack(anchor='w')
-        ctk.CTkLabel(inner, text="ADVANCED SECURITY AUDITOR  v7.0  |  MINT PROJECTS",
+        ctk.CTkLabel(inner, text="ADVANCED SECURITY AUDITOR  v8.0  |  MINT PROJECTS",
                      font=('Courier',9), text_color=C['mu']
                      ).pack(anchor='w', pady=(2,18))
 

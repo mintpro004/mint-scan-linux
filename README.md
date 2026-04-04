@@ -1,4 +1,4 @@
-# Mint Scan v7 — Advanced Linux Security Auditor
+# Mint Scan v8 — Advanced Linux Security Auditor
 **By Mint Projects, Pretoria**
 
 ## Quick Start
@@ -51,7 +51,7 @@ bash run.sh
 - Python 3.9+
 - python3-tk (auto-installed by install.sh)
 
-## v7 Fixes (this release)
+## v8 Fixes (this release)
 - Fixed: 7 screen modules importing C/MONO/MONO_SM from wrong module (utils → widgets)
 - Fixed: Wireless tab missing from ALL_TABS and screen_map in app.py
 - Fixed: companion_app.html completely rebuilt — was a static placeholder, now fully functional
