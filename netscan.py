@@ -51,46 +51,23 @@ class NetScanScreen(ctk.CTkFrame):
         
         tf_hdr = ctk.CTkFrame(self.traffic_card, fg_color='transparent')
         tf_hdr.pack(fill='x', padx=8, pady=(4,0))
-
+        
         self.cap_status = ctk.CTkLabel(tf_hdr, text="● IDLE — tap 📡 TRAFFIC to start",
                                         font=MONO_SM, text_color=C['mu'])
         self.cap_status.pack(side='left', padx=4)
+        
+        self.analyze_btn = Btn(tf_hdr, "📊 ANALYZE", command=self._analyze_traffic, variant='blue', width=90)
+        self.analyze_btn.pack(side='right', padx=4)
+        self.save_log_btn = Btn(tf_hdr, "💾 SAVE LOG", command=self._save_traffic_log, variant='ghost', width=90)
+        self.save_log_btn.pack(side='right', padx=4)
+        self.copy_log_btn = Btn(tf_hdr, "📋 COPY", command=self._copy_traffic_log, variant='ghost', width=80)
+        self.copy_log_btn.pack(side='right', padx=4)
 
-        # Action buttons — right side
-        self.analyze_btn  = Btn(tf_hdr, "📊 ANALYZE",  command=self._analyze_traffic,    variant='blue',  width=90)
-        self.save_log_btn = Btn(tf_hdr, "💾 SAVE",      command=self._save_traffic_log,   variant='ghost', width=70)
-        self.copy_log_btn = Btn(tf_hdr, "📋 COPY ALL",  command=self._copy_traffic_log,   variant='ghost', width=90)
-        self.paste_btn    = Btn(tf_hdr, "📌 PASTE",     command=self._paste_to_log,        variant='ghost', width=70)
-        self.clear_btn    = Btn(tf_hdr, "🗑 CLEAR",     command=self._clear_traffic_log,  variant='ghost', width=70)
-        for b in [self.clear_btn, self.paste_btn, self.copy_log_btn, self.save_log_btn, self.analyze_btn]:
-            b.pack(side='right', padx=2)
-
-        # Search row
-        find_row = ctk.CTkFrame(self.traffic_card, fg_color='transparent')
-        find_row.pack(fill='x', padx=8, pady=(2,0))
-        ctk.CTkLabel(find_row, text="Find:", font=('Courier',9), text_color=C['mu']).pack(side='left')
-        self.find_entry = ctk.CTkEntry(find_row, width=180, font=('Courier',9),
-                                        fg_color=C['bg'], border_color=C['br'],
-                                        text_color=C['tx'], height=26,
-                                        placeholder_text="search traffic...")
-        self.find_entry.pack(side='left', padx=4)
-        Btn(find_row, "↓ FIND", command=self._find_in_log, variant='ghost', width=70).pack(side='left', padx=2)
-        Btn(find_row, "↑ PREV", command=lambda: self._find_in_log(reverse=True), variant='ghost', width=70).pack(side='left', padx=2)
-        self.find_count_lbl = ctk.CTkLabel(find_row, text="", font=('Courier',8), text_color=C['mu'])
-        self.find_count_lbl.pack(side='left', padx=6)
-
-        # Traffic log — always stays 'normal' so user can select, copy, paste freely
-        self.traffic_log = ctk.CTkTextbox(self.traffic_card, height=220,
+        self.traffic_log = ctk.CTkTextbox(self.traffic_card, height=160,
                                            font=('Courier',10), fg_color=C['bg'],
-                                           text_color=C['ac'], border_width=0,
-                                           wrap='none')
-        self.traffic_log.pack(fill='both', padx=8, pady=(4,8))
+                                           text_color=C['ac'], border_width=0)
+        self.traffic_log.pack(fill='x', padx=8, pady=(0,8))
         self.traffic_log.configure(state='normal')
-        # Bind Ctrl+A select all, Ctrl+C copy, Ctrl+V paste
-        self.traffic_log.bind("<Control-a>", lambda e: self._select_all_log())
-        self.traffic_log.bind("<Control-c>", lambda e: self._copy_selection())
-        self.traffic_log.bind("<Control-v>", lambda e: self._paste_to_log())
-        self._find_pos = '1.0'
 
         # Vulnerabilities
         SectionHeader(body, '03', 'VULNERABILITIES').pack(fill='x', padx=14, pady=(10,4))
@@ -298,142 +275,20 @@ class NetScanScreen(ctk.CTkFrame):
         self.traffic_log.insert('end', msg + '\n')
         self.traffic_log.see('end')
 
-    def _select_all_log(self):
-        """Select all text in traffic log."""
-        self.traffic_log.tag_add('sel', '1.0', 'end')
-        return 'break'
-
-    def _copy_selection(self):
-        """Copy selected text or all text if nothing selected."""
-        try:
-            txt = self.traffic_log.get('sel.first', 'sel.last')
-        except Exception:
-            txt = self.traffic_log.get('1.0', 'end').strip()
-        if txt:
-            copy_to_clipboard(txt)
-            self.cap_status.configure(text=f"● COPIED ({len(txt)} chars)", text_color=C['ok'])
-        return 'break'
-
     def _copy_traffic_log(self):
-        """Copy entire log to system clipboard."""
         txt = self.traffic_log.get('1.0', 'end').strip()
-        if not txt:
-            self.cap_status.configure(text="● LOG IS EMPTY", text_color=C['mu'])
-            return
-        copy_to_clipboard(txt)
-        lines = len(txt.splitlines())
-        self.cap_status.configure(text=f"● COPIED {lines} lines", text_color=C['ok'])
-
-    def _paste_to_log(self):
-        """Paste from system clipboard into traffic log."""
-        try:
-            # Try tkinter clipboard first
-            root = self.winfo_toplevel()
-            txt = root.clipboard_get()
-        except Exception:
-            try:
-                import subprocess
-                r = subprocess.run('xclip -selection clipboard -o',
-                                   shell=True, capture_output=True, text=True, timeout=2)
-                txt = r.stdout
-            except Exception:
-                txt = ''
-        if txt:
-            self.traffic_log.insert('end', txt)
-            self.traffic_log.see('end')
-            self.cap_status.configure(text=f"● PASTED ({len(txt)} chars)", text_color=C['ok'])
-
-    def _clear_traffic_log(self):
-        """Clear all traffic log content."""
-        self.traffic_log.delete('1.0', 'end')
-        self.cap_status.configure(text="● LOG CLEARED", text_color=C['mu'])
-        self._find_pos = '1.0'
-
-    def _find_in_log(self, reverse=False):
-        """Search traffic log for a term, highlight and jump."""
-        query = self.find_entry.get().strip()
-        if not query:
-            return
-        content = self.traffic_log.get('1.0', 'end')
-        lines   = content.splitlines()
-        # Count matches
-        total = sum(1 for l in lines if query.lower() in l.lower())
-        if total == 0:
-            self.find_count_lbl.configure(text=f"Not found", text_color=C['wn'])
-            return
-        # Remove old highlights
-        self.traffic_log.tag_remove('found', '1.0', 'end')
-        self.traffic_log.tag_config('found', background=C['am'], foreground=C['bg'])
-        # Highlight all
-        idx = '1.0'
-        while True:
-            idx = self.traffic_log.search(query, idx, nocase=True, stopindex='end')
-            if not idx:
-                break
-            end_idx = f"{idx}+{len(query)}c"
-            self.traffic_log.tag_add('found', idx, end_idx)
-            idx = end_idx
-        # Navigate
-        search_from = self._find_pos
-        direction   = '-backwards' if reverse else ''
-        nxt = self.traffic_log.search(query, search_from, nocase=True,
-                                       stopindex='1.0' if reverse else 'end',
-                                       backwards=reverse)
-        if not nxt:
-            # Wrap around
-            nxt = self.traffic_log.search(query, 'end' if reverse else '1.0',
-                                           nocase=True,
-                                           stopindex='1.0' if reverse else 'end',
-                                           backwards=reverse)
-        if nxt:
-            self.traffic_log.see(nxt)
-            self._find_pos = f"{nxt}+{len(query)}c" if not reverse else nxt
-            self.find_count_lbl.configure(text=f"{total} match(es)", text_color=C['ok'])
+        if txt and copy_to_clipboard(txt):
+            self.cap_status.configure(text="● LOG COPIED", text_color=C['ok'])
 
     def _save_traffic_log(self):
-        """Save traffic log with timestamp filename, supports .txt and .pcap (raw)."""
         txt = self.traffic_log.get('1.0', 'end').strip()
-        if not txt:
-            self.cap_status.configure(text="● NOTHING TO SAVE", text_color=C['mu'])
-            return
+        if not txt: return
         import tkinter.filedialog as fd
-        ts = time.strftime('%Y%m%d_%H%M%S')
-        path = fd.asksaveasfilename(
-            defaultextension=".txt",
-            initialfile=f"traffic_{ts}.txt",
-            filetypes=[
-                ("Text log",    "*.txt"),
-                ("CSV export",  "*.csv"),
-                ("All files",   "*.*"),
-            ])
-        if not path:
-            return
-        if path.endswith('.csv'):
-            # Export as structured CSV
-            lines = txt.splitlines()
-            import csv, io
-            buf = io.StringIO()
-            w   = csv.writer(buf)
-            w.writerow(['timestamp', 'direction', 'protocol', 'src', 'dst', 'info'])
-            for l in lines:
-                parts = l.split()
-                if len(parts) >= 5:
-                    w.writerow([parts[0] if parts else '',
-                                '', '', '', '', l])
-                else:
-                    w.writerow(['', '', '', '', '', l])
-            with open(path, 'w', newline='') as f:
-                f.write(buf.getvalue())
-        else:
+        path = fd.asksaveasfilename(defaultextension=".txt", initialfile="traffic_log.txt")
+        if path:
             with open(path, 'w') as f:
-                f.write(f"# Mint Scan v8 — Traffic Log\n")
-                f.write(f"# Saved: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"# Lines: {len(txt.splitlines())}\n\n")
                 f.write(txt)
-        size = os.path.getsize(path)
-        self.cap_status.configure(
-            text=f"● SAVED: {os.path.basename(path)} ({size//1024}KB)",
-            text_color=C['ok'])
+            self.cap_status.configure(text=f"● SAVED TO {os.path.basename(path)}", text_color=C['ok'])
 
     def _analyze_traffic(self):
         txt = self.traffic_log.get('1.0', 'end').strip()

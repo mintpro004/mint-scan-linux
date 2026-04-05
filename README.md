@@ -1,42 +1,61 @@
-# Mint Scan v8 — Advanced Linux Security Auditor
-**By Mint Projects PTY (Ltd) · Pretoria, South Africa**
+# Mint Scan v7 — Advanced Linux Security Auditor
+**By Mint Projects, Pretoria**
 
-## What's New in v8
-
-### 🔧 Bug Fixes
-- **Chromebook UFW fix** — Installer detects Crostini at runtime via `crosh`, kernel string, and `/proc/version`. Skips `iptables-persistent` and runs a stripped-down UFW install that succeeds on Chromebook.
-- **Sudo hang eliminated** — `DEBIAN_FRONTEND=noninteractive` is now injected directly into the subprocess environment dict, not just as a shell prefix. Fully unattended install on all platforms.
-
-### ✨ New Features
-- **Traffic Log clipboard operations** — Copy All, Copy Selection, Paste (Ctrl+V / PASTE button), Select All, Clear, Find/Search (↓↑ nav, all-match highlight), Save as TXT, Save as CSV. Log stays always editable.
-- **4-platform mobile apps** — `mint_scan_android.html` (42KB, self-contained): 8 tabs, 0–100 security score, WebRTC leak detection, port scanner, DNS/GeoIP/SSL, bi-directional sync, offline service worker.
-  - `bash build_mobile.sh all` → Android APK + iOS PWA + Windows Electron + macOS Electron
-
-## Quick Install
-
+## Quick Start
 ```bash
-# Chromebook / Ubuntu / Kali / WSL2
-git clone https://github.com/mintpro004/mint-scan-linux.git ~/mint-scan-linux
-cd ~/mint-scan-linux
 bash install.sh
 bash run.sh
 ```
 
-## Supported Platforms
-| Platform | Status |
-|---|---|
-| Chromebook (Crostini) | ✅ Fixed in v8 |
-| Ubuntu 20.04+ | ✅ |
-| Debian 11/12 | ✅ |
-| Kali Linux | ✅ |
-| Windows WSL2 | ✅ |
+## What's Included (20 Screens)
+| Tab | Description |
+|-----|-------------|
+| Dashboard | System overview, security score, IP info |
+| Permissions | File/sudo/SUID permission checker |
+| Wi-Fi | Network scanner, signal strength, encryption |
+| Calls | Call log analysis, number risk scoring |
+| Network | Interfaces, active connections, public IP |
+| Battery | Live battery stats from /sys/class/power_supply |
+| Threats | Port scan, process audit, auto-remediation |
+| Guardian | Auto-defense, panic button, USB lockdown |
+| Notifs | Desktop notification monitor |
+| Port Scan | TCP/UDP open ports with risk flags |
+| USB Sync | **Phone companion via USB (ADB)** |
+| Wireless | **Wi-Fi companion server (no cable needed)** |
+| Net Scan | Device discovery, traffic capture, vuln scan |
+| Malware | ClamAV integration, rootkit check (rkhunter) |
+| Sys Fix | System health, permissions, firewall repair |
+| Firewall | UFW rules manager, add/remove rules |
+| Toolbox | Install/manage all security tools |
+| Investigate | IP geolocation, WHOIS, attack timeline |
+| Auditor | Kernel audit (auditd), binary integrity |
+| Settings | Theme, accent color, font size |
 
-## 22 Screens
-Dashboard · Permissions · Wi-Fi · Calls · Network · Battery · Threats · Guardian · Notifs · Port Scan · USB Sync · Wireless · Device Scan · Recovery · Net Scan · Malware · Sys Fix · Firewall · Toolbox · Investigate · Auditor · Settings
+## Phone Companion — Two Methods
 
-## Support
-- Email: support@mintprojects.co.za
-- Website: https://mintprojects.co.za
-- GitHub: https://github.com/mintpro004/mint-scan-linux
+### Method 1: USB (ADB)
+1. Phone → Settings → About → tap Build Number 7× → Developer Options → USB Debugging ON
+2. Plug USB cable into Linux machine
+3. Mint Scan → USB Sync → tap ↺ RESCAN
+4. Tap ALLOW on phone popup
+5. Use the sync buttons to pull calls, SMS, contacts, screenshots
 
-🇿🇦 Proudly South African
+### Method 2: Wi-Fi (No cable)
+1. Mint Scan → Wireless tab → tap START SERVER
+2. Note the IP:Port shown (e.g. 192.168.1.100:7777)
+3. On phone browser: open http://192.168.1.100:7777
+4. Companion app loads — use Sync tab to send data to desktop
+
+## Requirements
+- Ubuntu 20.04+, Kali Linux, Linux Mint, ChromeOS (Linux), WSL2
+- Python 3.9+
+- python3-tk (auto-installed by install.sh)
+
+## v7 Fixes (this release)
+- Fixed: 7 screen modules importing C/MONO/MONO_SM from wrong module (utils → widgets)
+- Fixed: Wireless tab missing from ALL_TABS and screen_map in app.py
+- Fixed: companion_app.html completely rebuilt — was a static placeholder, now fully functional
+- Fixed: /sync/network and /sync/location endpoints missing from wireless server
+- Fixed: ADB udev rules not written during install (phone not detected)
+- Fixed: run.sh now smarter self-healer
+- Added: Wireless tab registered as full screen in navigation
