@@ -1,42 +1,82 @@
 #!/bin/bash
+# ╔══════════════════════════════════════════════════════════════╗
+# ║   MINT SCAN v8 — COMPREHENSIVE UPDATER                      ║
+# ║   Works: GitHub pull · Offline self-heal · Package update   ║
+# ╚══════════════════════════════════════════════════════════════╝
+CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+RED='\033[0;31m'; BOLD='\033[1m'; NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo -e "\033[0;36m[ MINT SCAN ]\033[0m Fixing ownership..."
+echo -e "${CYAN}${BOLD}"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║   MINT SCAN v8 — COMPREHENSIVE UPDATER                      ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo -e "${NC}"
+
+# [1] Fix ownership
+echo -e "${YELLOW}[1/4] Fixing ownership...${NC}"
 sudo chown -R "$USER:$USER" "$SCRIPT_DIR" 2>/dev/null || true
+chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
+echo -e "${GREEN}  ✓ Done${NC}"
 
-echo -e "\033[0;36m[ MINT SCAN ]\033[0m Pulling updates from GitHub..."
+# [2] Try GitHub pull — gracefully skip if no internet / not a git repo
+echo -e "${YELLOW}[2/4] Checking for GitHub updates...${NC}"
+PULLED=false
 
-# Check if we are in a git repo
 if [ -d ".git" ]; then
-    # Stash local changes (like our fixes) so pull can proceed
-    STASHED=false
-    if [[ $(git status --porcelain) ]]; then
-        echo -e "\033[0;33m[ MINT SCAN ]\033[0m Saving local fixes..."
-        git stash -u > /dev/null
-        STASHED=true
-    fi
-
-    if git pull --rebase origin main; then
-        echo -e "\033[0;32m[ MINT SCAN ]\033[0m Pull successful."
-    else
-        echo -e "\033[0;31m[ MINT SCAN ]\033[0m Pull failed. Checking connectivity..."
-        if ! ping -c 1 -W 5 8.8.8.8 > /dev/null 2>&1; then
-            echo -e "\033[0;31m[ MINT SCAN ]\033[0m ERROR: No internet connection."
-        elif ! nslookup github.com > /dev/null 2>&1; then
-            echo -e "\033[0;31m[ MINT SCAN ]\033[0m ERROR: DNS resolution failed (cannot find github.com)."
+    # Test connectivity first (2s timeout)
+    if curl -s --connect-timeout 2 https://github.com > /dev/null 2>&1; then
+        echo -e "  ${GREEN}✓ Internet available — pulling from GitHub...${NC}"
+        # Stash local changes so pull can proceed
+        if [[ $(git status --porcelain) ]]; then
+            echo -e "  ${YELLOW}Stashing local changes...${NC}"
+            git stash -u > /dev/null 2>&1 || true
+            STASHED=true
         fi
-        echo -e "\033[0;33m[ MINT SCAN ]\033[0m Proceeding with local self-healing only..."
-    fi
 
-    # Bring back our fixes
-    if [ "$STASHED" = true ]; then
-        echo -e "\033[0;33m[ MINT SCAN ]\033[0m Re-applying local fixes..."
-        git stash pop > /dev/null || echo -e "\033[0;31m[ MINT SCAN ]\033[0m Note: Conflicts occurred during re-application."
+        if git pull --rebase origin main 2>/dev/null; then
+            echo -e "  ${GREEN}✓ GitHub pull successful${NC}"
+            PULLED=true
+        else
+            echo -e "  ${YELLOW}  Pull failed (possible conflict) — continuing with local files${NC}"
+        fi
+
+        # Re-apply stashed changes
+        if [ "${STASHED:-false}" = true ]; then
+            git stash pop > /dev/null 2>&1 || true
+        fi
+    else
+        echo -e "  ${YELLOW}  No internet connection — skipping GitHub pull${NC}"
+        echo -e "  ${YELLOW}  Running offline self-heal only${NC}"
     fi
 else
-    echo -e "\033[0;31m[ MINT SCAN ]\033[0m Not a git repository. Skipping pull."
+    echo -e "  ${YELLOW}  Not a git repository — running offline self-heal only${NC}"
+    echo -e "  ${YELLOW}  To use GitHub updates: git clone https://github.com/mintpro004/mint-scan-linux.git${NC}"
 fi
 
-echo -e "\033[0;36m[ MINT SCAN ]\033[0m Running self-healing installer..."
+# [3] Update Python packages
+echo -e "${YELLOW}[3/4] Updating Python packages...${NC}"
+if [ -d "venv" ]; then
+    source venv/bin/activate 2>/dev/null
+    pip install -q --upgrade pip 2>/dev/null
+    pip install -q --upgrade customtkinter requests psutil netifaces pillow darkdetect 2>/dev/null || true
+    echo -e "${GREEN}  ✓ Python packages updated${NC}"
+else
+    echo -e "  ${YELLOW}  venv not found — full install will rebuild it${NC}"
+fi
+
+# [4] Run self-healing installer
+echo -e "${YELLOW}[4/4] Running self-healing installer...${NC}"
 bash install.sh
+
+echo ""
+echo -e "${GREEN}${BOLD}"
+echo "╔══════════════════════════════════════════════════════════════╗"
+[ "$PULLED" = true ] && \
+echo "║  ✓ GitHub update applied                                    ║"
+echo "║  ✓ Packages updated                                         ║"
+echo "║  ✓ Self-heal complete                                       ║"
+echo "║  Run: bash run.sh                                           ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo -e "${NC}"
